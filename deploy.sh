@@ -29,6 +29,7 @@ SKIP_PULL="${SKIP_PULL:-0}"
 ALLOW_LOCALHOST="${ALLOW_LOCALHOST:-0}"
 LOG_FILE="/var/log/billing-tracker-deploy.log"
 LOCK_FILE="/var/lock/billing-tracker-deploy.lock"
+STATE_FILE="/var/lib/billing-tracker-last-deployed"
 TOTAL_STEPS=9
 
 # Health thresholds
@@ -202,11 +203,20 @@ main() {
     local_sha="$(git rev-parse HEAD)"
     remote_sha="$(git rev-parse "${REMOTE}/${BRANCH}")"
 
+    local deployed_sha=""
+    if [ -f "$STATE_FILE" ]; then
+      deployed_sha="$(cat "$STATE_FILE")"
+    fi
+
     if [ "$local_sha" = "$remote_sha" ]; then
       if [ "$FORCE" = "1" ]; then
         warn "No new commits, but FORCE=1 - redeploying anyway"
+      elif [ "$deployed_sha" != "$local_sha" ]; then
+        local short_deployed="${deployed_sha:0:7}"
+        warn "Code is current (${PREV_COMMIT}) but the last successful deploy was: ${short_deployed:-none} - deploying now"
+        need_install=1
       else
-        ok "Already up to date at ${PREV_COMMIT} - nothing to deploy (use FORCE=1 to redeploy anyway)"
+        ok "Already deployed at ${PREV_COMMIT} - nothing to do (use FORCE=1 to redeploy anyway)"
         exit 0
       fi
     else
@@ -334,6 +344,9 @@ main() {
   { pm2 list 2>/dev/null || true; } | indent
 
   # --------------------------------------------------------------------------
+  mkdir -p "$(dirname "$STATE_FILE")"
+  git rev-parse HEAD > "$STATE_FILE"
+
   local elapsed=$((SECONDS - START_TS))
   echo
   printf '%s================================================================%s\n' "$C_GREEN" "$C_RESET"
