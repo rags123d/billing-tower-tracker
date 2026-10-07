@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE } from "./config";
 
 export default function InvoicePaymentModal({
   bill,
@@ -37,7 +38,7 @@ export default function InvoicePaymentModal({
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/proceed-to-payment`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/proceed-to-payment`, {
         method: "POST"
       });
       const data = await res.json();
@@ -63,7 +64,7 @@ export default function InvoicePaymentModal({
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/record-payment`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/record-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -95,7 +96,7 @@ export default function InvoicePaymentModal({
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/close-bill`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/close-bill`, {
         method: "POST"
       });
       const data = await res.json();

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE } from "./config";
 
 export default function EditBillingModal({
   bill,
@@ -26,7 +27,7 @@ export default function EditBillingModal({
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/edit`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/edit`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
@@ -53,14 +54,14 @@ export default function EditBillingModal({
     setError("");
     try {
       // First save any modified fields
-      await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/edit`, {
+      await fetchWithAuth(`${API_BASE}/bills/${bill.id}/edit`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
 
       // Then call resubmit endpoint
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/resubmit`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/resubmit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ revisionNote: revisionNote.trim() })

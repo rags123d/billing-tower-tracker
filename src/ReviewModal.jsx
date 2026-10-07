@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE } from "./config";
 
 export default function ReviewModal({
   bill,
@@ -31,7 +32,7 @@ export default function ReviewModal({
     setError("");
 
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/review`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

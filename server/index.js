@@ -590,7 +590,7 @@ const bills = new Map([
           size: 142850,
           uploadedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
           uploadedBy: "Dr. Priya Sharma (Field Officer (AEE))",
-          url: "http://localhost:4000/uploads/demo-measurement-book.pdf"
+          url: "/uploads/demo-measurement-book.pdf"
         },
         {
           id: "doc-sample-2",
@@ -599,7 +599,7 @@ const bills = new Map([
           size: 89400,
           uploadedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
           uploadedBy: "Anil Mehta (Accounts & Finance Lead)",
-          url: "http://localhost:4000/uploads/demo-estimate-boq.csv"
+          url: "/uploads/demo-estimate-boq.csv"
         }
       ],
       history: [
@@ -941,7 +941,7 @@ async function ensureBillDocumentsAnalyzed(bill) {
               size: stats.size,
               uploadedAt: stats.mtime.toISOString(),
               uploadedBy: "Administrative / Project Records",
-              url: `http://localhost:4000/uploads/${f}`,
+              url: `/uploads/${f}`,
               pdfAnalysis: analysis
             });
           } catch (fileErr) {
@@ -1844,7 +1844,7 @@ app.post("/api/bills/:id/documents", requireAuth, async (req, res) => {
     size: fileSize || fileBuffer.length,
     uploadedAt: new Date().toISOString(),
     uploadedBy: `${req.user.name} (${req.user.role})`,
-    url: `http://localhost:4000/uploads/${storageFileName}`,
+    url: `/uploads/${storageFileName}`,
     pdfAnalysis
   };
 

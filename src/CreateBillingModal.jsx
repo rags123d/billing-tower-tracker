@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE } from "./config";
 
 export default function CreateBillingModal({
   onClose,
@@ -110,7 +111,7 @@ export default function CreateBillingModal({
         payload.photoUrls = [formData.customPhotoUrl.trim()];
       }
 
-      const res = await fetchWithAuth("http://localhost:4000/api/bills", {
+      const res = await fetchWithAuth(`${API_BASE}/bills`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

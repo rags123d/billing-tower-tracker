@@ -13,8 +13,7 @@ import NewTowerModal from "./NewTowerModal";
 import ReportsModal from "./ReportsModal";
 import NewPhotoModal from "./NewPhotoModal";
 import "./styles.css";
-
-const API = "http://localhost:4000/api";
+import { API_BASE as API } from "./config";
 
 /* ============================================================
    THEME CONFIG
