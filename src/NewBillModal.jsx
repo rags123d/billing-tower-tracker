@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE } from "./config";
 
 export default function NewBillModal({ onClose, onCreated, fetchWithAuth, currentBillCount = 1 }) {
   const defaultNextId = `BILL-${1000 + currentBillCount + 1}`;
@@ -24,7 +25,7 @@ export default function NewBillModal({ onClose, onCreated, fetchWithAuth, curren
   // Load existing Towers for linking
   useEffect(() => {
     let mounted = true;
-    fetchWithAuth("http://localhost:4000/api/towers")
+    fetchWithAuth(`${API_BASE}/towers`)
       .then((res) => res.json())
       .then((list) => {
         if (mounted && Array.isArray(list) && list.length > 0) {
@@ -90,7 +91,7 @@ export default function NewBillModal({ onClose, onCreated, fetchWithAuth, curren
         payload.photoUrls = [formData.customPhotoUrl.trim()];
       }
 
-      const res = await fetchWithAuth("http://localhost:4000/api/bills", {
+      const res = await fetchWithAuth(`${API_BASE}/bills`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

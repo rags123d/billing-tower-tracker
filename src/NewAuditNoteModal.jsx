@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE } from "./config";
 
 const ACTION_TYPES = [
   "Physical Field Verification",
@@ -43,7 +44,7 @@ export default function NewAuditNoteModal({
     setError("");
 
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${billId}/audit-entry`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${billId}/audit-entry`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

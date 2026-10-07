@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE } from "./config";
 
 const CATEGORIES = [
   { id: "Invoice / Bill", label: "📜 Contractor Invoice / RA Bill", defaultPrefix: "INV" },
@@ -106,7 +107,7 @@ export default function ManualRecordModal({
         items: items.filter((it) => it.desc.trim().length > 0)
       };
 
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${billId}/documents/manual`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${billId}/documents/manual`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

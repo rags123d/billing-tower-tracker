@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE } from "./config";
 
 export default function WorkflowActionBanner({ bill, user, fetchWithAuth, onBillUpdated, onToast }) {
   const [loading, setLoading] = useState(false);
@@ -32,7 +33,7 @@ export default function WorkflowActionBanner({ bill, user, fetchWithAuth, onBill
   const handleSubmitBill = async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/submit`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/submit`, {
         method: "POST"
       });
       const data = await res.json();
@@ -51,7 +52,7 @@ export default function WorkflowActionBanner({ bill, user, fetchWithAuth, onBill
     if (!window.confirm(`Approve Bill "${bill.id}" and generate official Tax Invoice?`)) return;
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/review`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ decision: "approve", remarks: "Technical & Measurement Verification Satisfactory" })
@@ -75,7 +76,7 @@ export default function WorkflowActionBanner({ bill, user, fetchWithAuth, onBill
     }
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/review`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ decision: "reject", remarks: rejectRemarks.trim() })
@@ -98,7 +99,7 @@ export default function WorkflowActionBanner({ bill, user, fetchWithAuth, onBill
     setLoading(true);
     try {
       // First update details
-      const editRes = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/edit`, {
+      const editRes = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/edit`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editData)
@@ -106,7 +107,7 @@ export default function WorkflowActionBanner({ bill, user, fetchWithAuth, onBill
       if (!editRes.ok) throw new Error("Failed to update bill edits");
 
       // Then resubmit
-      const resubmitRes = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/resubmit`, {
+      const resubmitRes = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/resubmit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ revisionNote: editData.revisionNote || "Rectified objections." })
@@ -128,7 +129,7 @@ export default function WorkflowActionBanner({ bill, user, fetchWithAuth, onBill
   const handleProceedToPayment = async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/proceed-to-payment`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/proceed-to-payment`, {
         method: "POST"
       });
       const data = await res.json();
@@ -151,7 +152,7 @@ export default function WorkflowActionBanner({ bill, user, fetchWithAuth, onBill
     }
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/record-payment`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/record-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(paymentData)
@@ -173,7 +174,7 @@ export default function WorkflowActionBanner({ bill, user, fetchWithAuth, onBill
     if (!window.confirm(`Permanently seal and close Bill file "${bill.id}"?`)) return;
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${bill.id}/close-bill`, {
+      const res = await fetchWithAuth(`${API_BASE}/bills/${bill.id}/close-bill`, {
         method: "POST"
       });
       const data = await res.json();

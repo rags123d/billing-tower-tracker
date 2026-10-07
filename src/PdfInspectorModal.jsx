@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { API_BASE } from "./config";
 
 function formatFileSize(bytes) {
   if (!bytes || bytes === 0) return "0 B";
@@ -30,7 +31,7 @@ export default function PdfInspectorModal({ doc, onClose, billId, fetchWithAuth 
     if (!analysis && doc?.id && billId && fetchWithAuth) {
       let isMounted = true;
       setLoadingAnalysis(true);
-      fetchWithAuth(`http://localhost:4000/api/bills/${billId}/documents/${doc.id}/analysis`)
+      fetchWithAuth(`${API_BASE}/bills/${billId}/documents/${doc.id}/analysis`)
         .then((res) => res.json())
         .then((data) => {
           if (isMounted && data.success && data.analysis) {

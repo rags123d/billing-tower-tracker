@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE } from "./config";
 
 export default function ReportsModal({ onClose, fetchWithAuth, onSelectBill }) {
   const [data, setData] = useState(null);
@@ -7,7 +8,7 @@ export default function ReportsModal({ onClose, fetchWithAuth, onSelectBill }) {
 
   useEffect(() => {
     let mounted = true;
-    fetchWithAuth("http://localhost:4000/api/reports")
+    fetchWithAuth(`${API_BASE}/reports`)
       .then((res) => res.json())
       .then((rep) => {
         if (mounted) {

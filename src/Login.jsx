@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API_BASE } from "./config";
 
 export default function Login({ onLoginSuccess }) {
   const [identifier, setIdentifier] = useState("");
@@ -18,7 +19,7 @@ export default function Login({ onLoginSuccess }) {
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:4000/api/auth/login", {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier: identifier.trim(), password })

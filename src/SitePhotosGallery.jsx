@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { API_BASE } from "./config";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -113,7 +114,7 @@ export default function SitePhotosGallery({
     setDeleting(true);
     try {
       const res = await fetchWithAuth(
-        `http://localhost:4000/api/bills/${bill.id}/photos/${currentPhoto.id}`,
+        `${API_BASE}/bills/${bill.id}/photos/${currentPhoto.id}`,
         { method: "DELETE" }
       );
       const data = await res.json();
@@ -446,7 +447,7 @@ function AddSitePhotoModal({ bill, currentUser, fetchWithAuth, onClose, onPhotoA
       };
 
       const res = await fetchWithAuth(
-        `http://localhost:4000/api/bills/${bill.id}/photos`,
+        `${API_BASE}/bills/${bill.id}/photos`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
