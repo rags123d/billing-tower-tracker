@@ -17,8 +17,9 @@ A complete React + Vite + Express starter implementing the enterprise Billing To
 
 | Role | Username / Email | Password | Department |
 | :--- | :--- | :--- | :--- |
+| **Billing Tower Admin** | `billing_tower` or `billing_tower@billing.gov` | `#bill@2026` | Billing Operations & Governance |
 | **Field Officer (AEE)** | `officer` or `officer@billing.gov` | `officer123` | BBMP Lakes & Water Bodies |
-| **System Administrator** | `admin` or `admin@billing.gov` | `admin123` | Executive & Systems Directorate |
+| **System Administrator** | `admin` or `admin@billing.gov` | `#bill@2026` | Executive & Systems Directorate |
 | **Finance Lead** | `finance` or `finance@billing.gov` | `finance123` | Finance Verification & Payments |
 
 ## Run

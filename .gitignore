@@ -11,6 +11,7 @@ build/
 # Server uploads & temporary files
 server/uploads/*
 !server/uploads/.gitkeep
+server/data/
 
 # Logs
 logs

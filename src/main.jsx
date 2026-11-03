@@ -6,24 +6,29 @@ import ManualRecordModal from "./ManualRecordModal";
 import ManualRecordDetailModal from "./ManualRecordDetailModal";
 import NewAuditNoteModal from "./NewAuditNoteModal";
 import PdfInspectorModal from "./PdfInspectorModal";
-import SitePhotosGallery from "./SitePhotosGallery";
 import Login from "./Login";
 import WorkflowActionBanner from "./WorkflowActionBanner";
 import NewTowerModal from "./NewTowerModal";
 import ReportsModal from "./ReportsModal";
-import NewPhotoModal from "./NewPhotoModal";
+
+import MasterManagementView from "./MasterManagementView";
+import DashboardView from "./DashboardView";
+import SlaNotificationsView from "./SlaNotificationsView";
+import ReportsView from "./ReportsView";
+import WorkflowTrackerJourney from "./WorkflowTrackerJourney";
 import "./styles.css";
-import { API_BASE as API } from "./config";
+
+const API = "http://localhost:4000/api";
 
 /* ============================================================
    THEME CONFIG
    ============================================================ */
 const THEMES = [
-  { id: "blue",    label: "Ocean Blue",     swatch: "#2563eb",  emoji: "🌊" },
-  { id: "purple",  label: "Royal Purple",   swatch: "#7c3aed",  emoji: "💜" },
-  { id: "emerald", label: "Forest Green",   swatch: "#059669",  emoji: "🌿" },
-  { id: "orange",  label: "Sunset Orange",  swatch: "#ea580c",  emoji: "🔥" },
-  { id: "dark",    label: "Midnight Dark",  swatch: "#1e293b",  emoji: "🌙" },
+  { id: "blue", label: "Ocean Blue", swatch: "#2563eb", emoji: "🌊" },
+  { id: "purple", label: "Royal Purple", swatch: "#7c3aed", emoji: "💜" },
+  { id: "emerald", label: "Forest Green", swatch: "#059669", emoji: "🌿" },
+  { id: "orange", label: "Sunset Orange", swatch: "#ea580c", emoji: "🔥" },
+  { id: "dark", label: "Midnight Dark", swatch: "#1e293b", emoji: "🌙" },
 ];
 
 function applyTheme(themeId) {
@@ -140,6 +145,10 @@ function AppMain({ user, token, onLogout }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Workflow Navigation & Modal States
+  const [activeNavView, setActiveNavView] = useState("bill_tracker"); // "bill_tracker" | "masters" | "sla" | "reports"
+
+
   // Manual addition modals state
   const [showNewBillModal, setShowNewBillModal] = useState(false);
   const [showManualRecordModal, setShowManualRecordModal] = useState(false);
@@ -148,7 +157,6 @@ function AppMain({ user, token, onLogout }) {
   const [selectedPdfDoc, setSelectedPdfDoc] = useState(null);
   const [showNewTowerModal, setShowNewTowerModal] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
-  const [showNewPhotoModal, setShowNewPhotoModal] = useState(false);
   const [docFilter, setDocFilter] = useState("all");
 
   // Track individually checked/completed steps (user-clicked tick marks)
@@ -516,45 +524,74 @@ function AppMain({ user, token, onLogout }) {
       <header className="topbar">
         <div className="topbar-brand">
           <div>
-            <div className="eyebrow">ENTERPRISE BILLING • BBMP WORKFLOW PORTAL</div>
-            <h1>Billing Tower Tracker</h1>
+            <div className="eyebrow">ENTERPRISE GOVERNANCE • BILLING WORKFLOW TRACKER</div>
+            <h1>Billing Workflow Tracker</h1>
           </div>
         </div>
 
-        <div className="topbar-right">
-          {/* Topbar Master Reports & Tower Actions */}
+        {/* PRIMARY WORKFLOW NAVIGATION TABS */}
+        <div className="nav-view-switcher">
           <button
             type="button"
-            className="btn-reports-topbar"
-            onClick={() => setShowReportsModal(true)}
-            title="View executive analytics report & workflow funnel across all towers"
+            className={`btn-nav-tab ${activeNavView === "dashboard" ? "active" : ""}`}
+            onClick={() => setActiveNavView("dashboard")}
+            title="Management Dashboard — KPIs, Analysis & Analytics"
           >
             <span>📊</span>
-            <span>Reports & Analytics</span>
+            <span>Dashboard</span>
           </button>
-
           <button
             type="button"
-            className="btn-add-tower-topbar"
-            onClick={() => setShowNewTowerModal(true)}
-            title="Register a new Master Infrastructure Tower asset"
+            className={`btn-nav-tab ${activeNavView === "bill_tracker" ? "active" : ""}`}
+            onClick={() => setActiveNavView("bill_tracker")}
+            title="6. Workflow Tracking: Complete journey from Submission to Payment"
           >
-            <span>🏛️</span>
-            <span>+ Register Tower</span>
+            <span>💼</span>
+            <span>6. Workflow Tracking</span>
+            {billsList.length > 0 && <span className="nav-tab-count">{billsList.length}</span>}
           </button>
+          <button
+            type="button"
+            className={`btn-nav-tab ${activeNavView === "masters" ? "active" : ""}`}
+            onClick={() => setActiveNavView("masters")}
+          >
+            <span>⚙️</span>
+            <span>Masters</span>
+          </button>
+          <button
+            type="button"
+            className={`btn-nav-tab ${activeNavView === "sla" ? "active" : ""}`}
+            onClick={() => setActiveNavView("sla")}
+          >
+            <span>⏱️</span>
+            <span>SLA & Alerts</span>
+          </button>
+          <button
+            type="button"
+            className={`btn-nav-tab ${activeNavView === "reports" ? "active" : ""}`}
+            onClick={() => setActiveNavView("reports")}
+          >
+            <span>📈</span>
+            <span>Reports</span>
+          </button>
+        </div>
 
-          {/* Bill Selector & Manual Creation Button */}
+        <div className="topbar-right">
+          {/* Bill Selector */}
           <div className="bill-selector-wrapper">
             {billsList.length > 0 && (
               <select
                 value={bill.id}
-                onChange={(e) => handleBillSwitch(e.target.value)}
+                onChange={(e) => {
+                  handleBillSwitch(e.target.value);
+                  setActiveNavView("bill_tracker");
+                }}
                 className="bill-selector-select"
-                title="Switch active bill tracker"
+                title="Switch active bill docket"
               >
                 {billsList.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.id} — {b.projectName.length > 25 ? b.projectName.slice(0, 25) + "…" : b.projectName}
+                    {b.id} [{b.client || "BBMP"}] — {b.projectName.length > 22 ? b.projectName.slice(0, 22) + "…" : b.projectName}
                   </option>
                 ))}
               </select>
@@ -564,7 +601,7 @@ function AppMain({ user, token, onLogout }) {
               type="button"
               className="btn-add-bill-topbar"
               onClick={() => setShowNewBillModal(true)}
-              title="Manually create a new bill / project workflow"
+              title="Manually create a new bill docket"
             >
               <span>➕</span>
               <span>New Bill</span>
@@ -577,14 +614,28 @@ function AppMain({ user, token, onLogout }) {
             onThemeChange={handleThemeChange}
           />
 
-          <div className="bill-badge">{bill.id}</div>
+          {user && (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "8px", padding: "4px 10px", background: "rgba(255, 255, 255, 0.06)", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.12)" }}>
+              <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: user.badgeColor || "#2563eb", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", color: "#fff" }}>
+                {getInitials(user.name || user.username)}
+              </span>
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
+                <span style={{ fontSize: "12px", fontWeight: "600", color: "#f8fafc" }}>
+                  {user.username}
+                </span>
+                <span style={{ fontSize: "10px", color: "#94a3b8" }}>
+                  {user.role}
+                </span>
+              </div>
+            </div>
+          )}
 
           <button
             type="button"
             className="btn-theme-toggle"
             onClick={onLogout}
             title="Sign out of application"
-            style={{ marginLeft: "8px", background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.2)" }}
+            style={{ marginLeft: "6px", background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.2)" }}
           >
             <span>🚪 Logout</span>
           </button>
@@ -592,469 +643,407 @@ function AppMain({ user, token, onLogout }) {
       </header>
 
       <main>
-        {/* Workflow Lifecycle Action Banner (Review, Approve, Reject to Edit, Invoice, Payment, Close) */}
-        <WorkflowActionBanner
-          bill={bill}
-          user={user}
-          fetchWithAuth={fetchWithAuth}
-          onBillUpdated={(updated) => {
-            setBill(updated);
-            loadBillsList();
-          }}
-          onToast={(msg) => setToast(msg)}
-        />
 
-        <section className="summary-grid">
-          <div className="card project-card">
-            <div className="muted" style={{ display: "flex", justifyContent: "space-between" }}>
-              <span>Project & Tower Details</span>
-              {bill.towerCode && (
-                <span className="tower-code-pill" title={bill.towerName || "Master Tower"}>
-                  🏛️ {bill.towerCode}: {bill.towerName || "Master Tower"}
-                </span>
-              )}
-            </div>
-            <h2>{bill.projectName}</h2>
-            <div className="meta-row">
-              <span>
-                Workflow: <b>{bill.projectType}</b>
-              </span>
-              <span>
-                Active Status: <b>Step {bill.currentStep} — {activeStage}</b>
-              </span>
-              {bill.amount && (
-                <span>
-                  Sanctioned Budget: <b style={{ color: "#34d399" }}>{bill.amount}</b>
-                </span>
-              )}
-              {bill.contractor && (
-                <span>
-                  Contractor: <b>{bill.contractor}</b>
-                </span>
-              )}
-              {bill.mbNumber && (
-                <span>
-                  Measurement Book: <b style={{ color: "#93c5fd" }}>{bill.mbNumber}</b>
-                </span>
-              )}
-              {bill.ward && (
-                <span>
-                  Division: <b>{bill.ward}</b>
-                </span>
-              )}
-            </div>
-          </div>
+        {/* VIEW: MANAGEMENT DASHBOARD */}
+        {activeNavView === "dashboard" && (
+          <DashboardView
+            fetchWithAuth={fetchWithAuth}
+            onSelectBill={(billId) => {
+              handleBillSwitch(billId);
+              setActiveNavView("bill_tracker");
+            }}
+          />
+        )}
 
-          <div className="card progress-card">
-            <div className="progress-head">
-              <span>Overall Stage Completion</span>
-              <strong>{progress}%</strong>
-            </div>
-            <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${progress}%` }} />
-            </div>
-            <small>
-              Currently at Step {bill.currentStep} of {bill.stages.length} stages
-            </small>
-          </div>
-        </section>
+        {/* VIEW 4: MASTER MANAGEMENT (11 CONFIGURABLE MASTERS) */}
+        {activeNavView === "masters" && (
+          <MasterManagementView
+            user={user}
+            fetchWithAuth={fetchWithAuth}
+            onToast={(msg) => setToast(msg)}
+            onNavigateToBillTracker={(billId) => {
+              handleBillSwitch(billId);
+              setActiveNavView("bill_tracker");
+            }}
+          />
+        )}
 
-        <section className="card tracker-card">
-          <div className="section-title">
-            <div>
-              <h2>Billing Tower Progression Track</h2>
-              <p>
-                Click any step below to inspect detailed requirements, checklist, SLA, and audit trail.
-              </p>
-            </div>
-            <span className="live-pill">● LIVE WORKFLOW</span>
-          </div>
+        {/* VIEW 5: SLA & NOTIFICATIONS CENTRE */}
+        {activeNavView === "sla" && (
+          <SlaNotificationsView
+            fetchWithAuth={fetchWithAuth}
+            onSelectBill={(id) => {
+              handleBillSwitch(id);
+              setActiveNavView("bill_tracker");
+            }}
+          />
+        )}
 
-          <div className="timeline-hint-banner">
-            <span>
-              💡 <b>Interactive Progression Tracker:</b> Click any step node to inspect its operational protocol, verification checklist, turnaround SLA, and audit record.
-            </span>
-            <span className="hint-pill-tag">Click Any Step</span>
-          </div>
+        {/* VIEW 6: REPORTS & ANALYTICS */}
+        {activeNavView === "reports" && (
+          <ReportsView
+            fetchWithAuth={fetchWithAuth}
+            onSelectBill={(id) => {
+              handleBillSwitch(id);
+              setActiveNavView("bill_tracker");
+            }}
+          />
+        )}
 
-          <div className="timeline">
-            {bill.stages.map((stage, i) => {
-              const step = i + 1;
-              const completed = step < bill.currentStep;
-              const isActive = step === bill.currentStep;
-              const isInspected = step === inspectedStep && showDetails;
-              const isSelected = step === selectedStep;
-              const isUserChecked = checkedSteps.has(step);
-              const showTick = completed || isUserChecked;
-              return (
-                <button
-                  key={stage + step}
-                  type="button"
-                  className={`node ${completed ? "completed" : ""} ${isActive ? "active" : ""} ${
-                    isInspected ? "inspected" : ""
-                  } ${isSelected ? "selected" : ""} ${isUserChecked ? "user-checked" : ""}`}
-                  onClick={() => handleStepClick(step)}
-                  title={`Click to view details and mark Step ${step}: ${stage}`}
-                >
-                  <span className="line" />
-                  <span className="dot">
-                    {showTick ? (
-                      <span className="tick-anim">✓</span>
-                    ) : (
-                      step
-                    )}
-                  </span>
-                  <span className="stage-no">STEP {step}</span>
-                  <span className="stage-title">{stage}</span>
-                  {completed ? (
-                    <span className="passed-label">PASSED ✓</span>
-                  ) : isUserChecked ? (
-                    <span className="checked-label">CHECKED ✓</span>
-                  ) : isActive ? (
-                    <span className="current-label">CURRENT</span>
-                  ) : isInspected ? (
-                    <span className="inspecting-label">INSPECTING</span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
+        {/* VIEW 3: ACTIVE BILL TRACKER & STAGE JOURNEY */}
+        {activeNavView === "bill_tracker" && (
+          <>
+            {/* Workflow Lifecycle Action Banner (Review, Approve, Reject to Edit, Invoice, Payment, Close) */}
+            <WorkflowActionBanner
+              bill={bill}
+              user={user}
+              fetchWithAuth={fetchWithAuth}
+              onBillUpdated={(updated) => {
+                setBill(updated);
+                loadBillsList();
+              }}
+              onToast={(msg) => setToast(msg)}
+            />
 
-          {/* Step Details Panel */}
-          {showDetails && inspectedStep && (
-            <StepDetails
-              step={inspectedStep}
-              totalSteps={bill.stages.length}
-              stageName={bill.stages[inspectedStep - 1]}
-              currentStep={bill.currentStep}
+            {/* 6. WORKFLOW TRACKING & COMPLETE JOURNEY ENGINE */}
+            {/* Submission → Approval stages → Finance → Audit, where applicable → Payment */}
+            {/* Shows: Completed stages, Current stage, Pending stage, Date entered into stage, Days pending, SLA, SLA status, Next stage */}
+            <WorkflowTrackerJourney
               bill={bill}
               user={user}
               saving={saving}
-              checkedSteps={checkedSteps}
-              onToggleCheck={(step) => {
-                setCheckedSteps((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(step)) {
-                    next.delete(step);
-                  } else {
-                    next.add(step);
-                  }
-                  return next;
-                });
-              }}
-              onClose={() => setShowDetails(false)}
-              onNavigate={handleNavigateStep}
-              onTransition={(target) => saveStep(target)}
+              onStepClick={handleStepClick}
+              onTransitionStep={(target) => saveStep(target)}
+              onSwitchBill={handleBillSwitch}
+              billsList={billsList}
             />
-          )}
 
-          {!showDetails && (
-            <div style={{ textAlign: "center", margin: "16px 0" }}>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => {
-                  setShowDetails(true);
-                  setInspectedStep(bill.currentStep);
+            {/* Step Details Panel (Checklist, Mandatory Documents & Inspection Notes) */}
+            {showDetails && inspectedStep && (
+              <StepDetails
+                step={inspectedStep}
+                totalSteps={bill.stages.length}
+                stageName={bill.stages[inspectedStep - 1]}
+                currentStep={bill.currentStep}
+                bill={bill}
+                user={user}
+                saving={saving}
+                checkedSteps={checkedSteps}
+                onToggleCheck={(step) => {
+                  setCheckedSteps((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(step)) {
+                      next.delete(step);
+                    } else {
+                      next.add(step);
+                    }
+                    return next;
+                  });
                 }}
-              >
-                🔍 Show Step {bill.currentStep} Details
-              </button>
-            </div>
-          )}
-
-          <div className="action-bar">
-            <div className="action-bar-info">
-              <b>
-                Target: Step {selectedStep} — {bill.stages[selectedStep - 1]}
-              </b>
-              <small>
-                Authorizing as <strong>{user.name}</strong> ({user.role})
-              </small>
-            </div>
-            <button
-              className="primary"
-              onClick={() => saveStep(selectedStep)}
-              disabled={saving || selectedStep < bill.currentStep}
-            >
-              {saving ? "Authorizing…" : "Approve & Transition Step"}
-            </button>
-          </div>
-        </section>
-
-        {/* Supporting Documents Section (PDF/Excel Upload & Manual Records) */}
-        <section className="card documents-card">
-          <div className="section-title">
-            <div>
-              <h2>Supporting Documents & Verification Records</h2>
-              <p>
-                Upload official files (PDF/Excel) or manually add Contractor Invoices, Measurement Book records, and Quality Certificates.
-              </p>
-            </div>
-            <div className="supported-badges">
-              <span className="format-pill pdf">📄 PDF Intelligence</span>
-              <span className="format-pill excel">📊 Excel BoQ</span>
-              <span className="format-pill manual" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#6ee7b7", border: "1px solid rgba(16, 185, 129, 0.3)" }}>✍️ Manual Invoices & Records</span>
-            </div>
-          </div>
-
-          {/* Action Toolbar: Filter Tabs + Open Manual Add Record */}
-          <div className="docs-action-toolbar">
-            <div className="docs-mode-tabs">
-              <button
-                type="button"
-                className={`docs-mode-tab ${docFilter === "all" ? "active" : ""}`}
-                onClick={() => setDocFilter("all")}
-              >
-                📁 All ({documents.length})
-              </button>
-              <button
-                type="button"
-                className={`docs-mode-tab ${docFilter === "uploaded" ? "active" : ""}`}
-                onClick={() => setDocFilter("uploaded")}
-              >
-                📄 Uploaded Files ({documents.filter((d) => !d.isManual).length})
-              </button>
-              <button
-                type="button"
-                className={`docs-mode-tab ${docFilter === "manual" ? "active" : ""}`}
-                onClick={() => setDocFilter("manual")}
-              >
-                ✍️ Manual Records ({documents.filter((d) => d.isManual).length})
-              </button>
-            </div>
-
-            <button
-              type="button"
-              className="btn-open-manual-record"
-              onClick={() => setShowManualRecordModal(true)}
-              title="Add invoice, measurement record, or quality certificate without uploading a file"
-            >
-              <span>✍️</span>
-              <span>+ Manually Add Document / Invoice</span>
-            </button>
-          </div>
-
-          {/* Drag & Drop Upload Zone (Shown unless filtered to manual only) */}
-          {docFilter !== "manual" && (
-            <div
-              className={`dropzone-container ${dragActive ? "drag-active" : ""}`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden-file-input"
-                accept=".pdf, .xlsx, .xls, .csv, application/pdf, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv"
-                onChange={handleFileChange}
-                disabled={uploading}
+                onClose={() => setShowDetails(false)}
+                onNavigate={handleNavigateStep}
+                onTransition={(target) => saveStep(target)}
               />
-              <div className="dropzone-icon">
-                {uploading ? "⏳" : "📁"}
+            )}
+
+            {!showDetails && (
+              <div style={{ textAlign: "center", margin: "16px 0" }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setShowDetails(true);
+                    setInspectedStep(bill.currentStep);
+                  }}
+                >
+                  🔍 Show Step {bill.currentStep} Details
+                </button>
               </div>
-              <p className="dropzone-title">
-                {uploading ? (
-                  "Processing and uploading file…"
-                ) : (
-                  <>
-                    Drag & drop your file here, or <span>browse from computer</span>
-                  </>
-                )}
-              </p>
-              <p className="dropzone-subtitle">
-                Accepts <strong>.pdf</strong>, <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.csv</strong> (Max 25 MB per file)
-              </p>
+            )}
+
+            <div className="action-bar">
+              <div className="action-bar-info">
+                <b>
+                  Target: Step {selectedStep} — {bill.stages[selectedStep - 1]}
+                </b>
+                <small>
+                  Authorizing as <strong>{user.name}</strong> ({user.role})
+                </small>
+              </div>
+              <button
+                className="primary"
+                onClick={() => saveStep(selectedStep)}
+                disabled={saving || selectedStep < bill.currentStep}
+              >
+                {saving ? "Authorizing…" : "Approve & Transition Step"}
+              </button>
             </div>
-          )}
 
-          {/* Filtered Documents List */}
-          {(() => {
-            const filteredDocs = documents.filter((doc) => {
-              if (docFilter === "uploaded") return !doc.isManual;
-              if (docFilter === "manual") return !!doc.isManual;
-              return true;
-            });
+            {/* Supporting Documents Section (PDF/Excel Upload & Manual Records) */}
+            <section className="card documents-card">
+              <div className="section-title">
+                <div>
+                  <h2>Supporting Documents & Verification Records</h2>
+                  <p>
+                    Upload official files (PDF/Excel) or manually add Contractor Invoices, Measurement Book records, and Quality Certificates.
+                  </p>
+                </div>
+                <div className="supported-badges">
+                  <span className="format-pill pdf">📄 PDF Intelligence</span>
+                  <span className="format-pill excel">📊 Excel BoQ</span>
+                  <span className="format-pill manual" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#6ee7b7", border: "1px solid rgba(16, 185, 129, 0.3)" }}>✍️ Manual Invoices & Records</span>
+                </div>
+              </div>
 
-            return (
-              <>
-                <div className="docs-list-heading">
-                  <h3>Attached Project Documents & Records</h3>
-                  <span className="docs-count-pill">
-                    {filteredDocs.length} {filteredDocs.length === 1 ? "Item" : "Items"}
-                  </span>
+              {/* Action Toolbar: Filter Tabs + Open Manual Add Record */}
+              <div className="docs-action-toolbar">
+                <div className="docs-mode-tabs">
+                  <button
+                    type="button"
+                    className={`docs-mode-tab ${docFilter === "all" ? "active" : ""}`}
+                    onClick={() => setDocFilter("all")}
+                  >
+                    📁 All ({documents.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`docs-mode-tab ${docFilter === "uploaded" ? "active" : ""}`}
+                    onClick={() => setDocFilter("uploaded")}
+                  >
+                    📄 Uploaded Files ({documents.filter((d) => !d.isManual).length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`docs-mode-tab ${docFilter === "manual" ? "active" : ""}`}
+                    onClick={() => setDocFilter("manual")}
+                  >
+                    ✍️ Manual Records ({documents.filter((d) => d.isManual).length})
+                  </button>
                 </div>
 
-                {filteredDocs.length === 0 ? (
-                  <div className="empty-docs">
-                    {docFilter === "manual"
-                      ? "No manual records entered yet. Click '+ Manually Add Document / Invoice' above to create one."
-                      : "No verification documents attached yet. Upload a Measurement Book (PDF) or BoQ Estimate above, or add a record manually."}
-                  </div>
-                ) : (
-                  <div className="docs-grid">
-                    {filteredDocs.map((doc) => {
-                      const isManual = !!doc.isManual;
-                      const isPdf = !isManual && (doc.type === "pdf" || doc.name.toLowerCase().endsWith(".pdf"));
-
-                      return (
-                        <div className="doc-card" key={doc.id}>
-                          <div className="doc-left">
-                            <div className={`doc-type-icon ${isManual ? "manual" : isPdf ? "pdf" : "excel"}`}>
-                              {isManual ? "✍️" : isPdf ? "📄" : "📊"}
-                            </div>
-                            <div className="doc-meta">
-                              <div className="doc-name" title={doc.name}>
-                                {doc.name}
-                                {isManual && <span className="doc-manual-pill">{doc.category || "Manual"}</span>}
-                              </div>
-                              <div className="doc-submeta">
-                                {isManual && doc.amount && (
-                                  <>
-                                    <span style={{ color: "#34d399", fontWeight: 800 }}>{doc.amount}</span>
-                                    <span>•</span>
-                                  </>
-                                )}
-                                {isManual && doc.refNumber && (
-                                  <>
-                                    <span>Ref: {doc.refNumber}</span>
-                                    <span>•</span>
-                                  </>
-                                )}
-                                {!isManual && (
-                                  <>
-                                    <span>{formatFileSize(doc.size)}</span>
-                                    <span>•</span>
-                                  </>
-                                )}
-                                <span>{formatDate(doc.uploadedAt || doc.recordDate)}</span>
-                                {doc.uploadedBy && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{doc.uploadedBy}</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="doc-actions">
-                            {/* Manual record view details button */}
-                            {isManual && (
-                              <button
-                                type="button"
-                                className="btn-doc-action view-record"
-                                onClick={() => setSelectedManualRecord(doc)}
-                                title="Inspect manual record details, line items, and voucher"
-                              >
-                                <span>👁️</span>
-                                <span>View Details</span>
-                              </button>
-                            )}
-
-                            {/* Deep PDF Inspector button for PDF files */}
-                            {isPdf && (
-                              <button
-                                type="button"
-                                className="btn-doc-action inspect-pdf"
-                                onClick={() => setSelectedPdfDoc(doc)}
-                                title="Deep PDF Analysis: Extract full text, inspect tables, entities & summary"
-                              >
-                                <span>🔍</span>
-                                <span>Deep PDF Analysis</span>
-                              </button>
-                            )}
-
-                            {/* Standard download/view link */}
-                            {doc.url && (
-                              <a
-                                href={doc.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="btn-doc-action download"
-                                download={doc.name}
-                                title="Download document"
-                              >
-                                <span>⬇</span>
-                                <span>Download</span>
-                              </a>
-                            )}
-
-                            <button
-                              type="button"
-                              className="btn-doc-action delete"
-                              onClick={() => handleDeleteDocument(doc.id, doc.name)}
-                              title="Remove record"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </section>
-
-        <section className="two-col">
-          <div className="card">
-            <div className="section-title">
-              <div>
-                <h2>Stage Audit Trail</h2>
-                <p>Immutable history of step transitions and authorizing officers.</p>
+                <button
+                  type="button"
+                  className="btn-open-manual-record"
+                  onClick={() => setShowManualRecordModal(true)}
+                  title="Add invoice, measurement record, or quality certificate without uploading a file"
+                >
+                  <span>✍️</span>
+                  <span>+ Manually Add Document / Invoice</span>
+                </button>
               </div>
-              <button
-                type="button"
-                className="btn-add-audit-note"
-                onClick={() => setShowAuditNoteModal(true)}
-                title="Add on-site inspection note, measurement cross-check, or verification remark"
-              >
-                <span>➕</span>
-                <span>Add Inspection Note</span>
-              </button>
-            </div>
-            <div className="audit-table">
-              <div className="tr th">
-                <span>Step</span>
-                <span>Stage</span>
-                <span>Timestamp</span>
-                <span>Due Date</span>
-                <span>Authorized By</span>
-              </div>
-              {bill.history
-                .slice()
-                .reverse()
-                .map((h, idx) => (
-                  <div className="tr" key={`${h.step}-${h.savedAt}-${idx}`}>
-                    <span>
-                      <b>#{h.step}</b>
-                    </span>
-                    <span>{bill.stages[h.step - 1]}</span>
-                    <span>{formatDate(h.savedAt || h.startedAt)}</span>
-                    <span>{formatDate(h.dueAt)}</span>
-                    <span>
-                      <span className="performer-tag">
-                        {h.performedBy || "System Baseline"}
+
+              {/* Drag & Drop Upload Zone (Shown unless filtered to manual only) */}
+              {docFilter !== "manual" && (
+                <div
+                  className={`dropzone-container ${dragActive ? "drag-active" : ""}`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden-file-input"
+                    accept=".pdf, .xlsx, .xls, .csv, application/pdf, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/csv"
+                    onChange={handleFileChange}
+                    disabled={uploading}
+                  />
+                  <div className="dropzone-icon">
+                    {uploading ? "⏳" : "📁"}
+                  </div>
+                  <p className="dropzone-title">
+                    {uploading ? (
+                      "Processing and uploading file…"
+                    ) : (
+                      <>
+                        Drag & drop your file here, or <span>browse from computer</span>
+                      </>
+                    )}
+                  </p>
+                  <p className="dropzone-subtitle">
+                    Accepts <strong>.pdf</strong>, <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.csv</strong> (Max 25 MB per file)
+                  </p>
+                </div>
+              )}
+
+              {/* Filtered Documents List */}
+              {(() => {
+                const filteredDocs = documents.filter((doc) => {
+                  if (docFilter === "uploaded") return !doc.isManual;
+                  if (docFilter === "manual") return !!doc.isManual;
+                  return true;
+                });
+
+                return (
+                  <>
+                    <div className="docs-list-heading">
+                      <h3>Attached Project Documents & Records</h3>
+                      <span className="docs-count-pill">
+                        {filteredDocs.length} {filteredDocs.length === 1 ? "Item" : "Items"}
                       </span>
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
+                    </div>
 
-          <SitePhotosGallery
-            bill={bill}
-            currentUser={user}
-            fetchWithAuth={fetchWithAuth}
-            onBillUpdated={(updatedBill) => setBill(updatedBill)}
-            onShowToast={(msg) => setToast(msg)}
-          />
-        </section>
+                    {filteredDocs.length === 0 ? (
+                      <div className="empty-docs">
+                        {docFilter === "manual"
+                          ? "No manual records entered yet. Click '+ Manually Add Document / Invoice' above to create one."
+                          : "No verification documents attached yet. Upload a Measurement Book (PDF) or BoQ Estimate above, or add a record manually."}
+                      </div>
+                    ) : (
+                      <div className="docs-grid">
+                        {filteredDocs.map((doc) => {
+                          const isManual = !!doc.isManual;
+                          const isPdf = !isManual && (doc.type === "pdf" || doc.name.toLowerCase().endsWith(".pdf"));
+
+                          return (
+                            <div className="doc-card" key={doc.id}>
+                              <div className="doc-left">
+                                <div className={`doc-type-icon ${isManual ? "manual" : isPdf ? "pdf" : "excel"}`}>
+                                  {isManual ? "✍️" : isPdf ? "📄" : "📊"}
+                                </div>
+                                <div className="doc-meta">
+                                  <div className="doc-name" title={doc.name}>
+                                    {doc.name}
+                                    {isManual && <span className="doc-manual-pill">{doc.category || "Manual"}</span>}
+                                  </div>
+                                  <div className="doc-submeta">
+                                    {isManual && doc.amount && (
+                                      <>
+                                        <span style={{ color: "#34d399", fontWeight: 800 }}>{doc.amount}</span>
+                                        <span>•</span>
+                                      </>
+                                    )}
+                                    {isManual && doc.refNumber && (
+                                      <>
+                                        <span>Ref: {doc.refNumber}</span>
+                                        <span>•</span>
+                                      </>
+                                    )}
+                                    {!isManual && (
+                                      <>
+                                        <span>{formatFileSize(doc.size)}</span>
+                                        <span>•</span>
+                                      </>
+                                    )}
+                                    <span>{formatDate(doc.uploadedAt || doc.recordDate)}</span>
+                                    {doc.uploadedBy && (
+                                      <>
+                                        <span>•</span>
+                                        <span>{doc.uploadedBy}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="doc-actions">
+                                {/* Manual record view details button */}
+                                {isManual && (
+                                  <button
+                                    type="button"
+                                    className="btn-doc-action view-record"
+                                    onClick={() => setSelectedManualRecord(doc)}
+                                    title="Inspect manual record details, line items, and voucher"
+                                  >
+                                    <span>👁️</span>
+                                    <span>View Details</span>
+                                  </button>
+                                )}
+
+                                {/* Deep PDF Inspector button for PDF files */}
+                                {isPdf && (
+                                  <button
+                                    type="button"
+                                    className="btn-doc-action inspect-pdf"
+                                    onClick={() => setSelectedPdfDoc(doc)}
+                                    title="Deep PDF Analysis: Extract full text, inspect tables, entities & summary"
+                                  >
+                                    <span>🔍</span>
+                                    <span>Deep PDF Analysis</span>
+                                  </button>
+                                )}
+
+                                {/* Standard download/view link */}
+                                {doc.url && (
+                                  <a
+                                    href={doc.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn-doc-action download"
+                                    download={doc.name}
+                                    title="Download document"
+                                  >
+                                    <span>⬇</span>
+                                    <span>Download</span>
+                                  </a>
+                                )}
+
+                                <button
+                                  type="button"
+                                  className="btn-doc-action delete"
+                                  onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                                  title="Remove record"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </section>
+
+            <section className="card audit-trail-card">
+              <div className="section-title">
+                <div>
+                  <h2>Stage Audit Trail</h2>
+                  <p>Immutable history of step transitions and authorizing officers.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-add-audit-note"
+                  onClick={() => setShowAuditNoteModal(true)}
+                  title="Add on-site inspection note, measurement cross-check, or verification remark"
+                >
+                  <span>➕</span>
+                  <span>Add Inspection Note</span>
+                </button>
+              </div>
+              <div className="audit-table">
+                <div className="tr th">
+                  <span>Step</span>
+                  <span>Stage</span>
+                  <span>Timestamp</span>
+                  <span>Due Date</span>
+                  <span>Authorized By</span>
+                </div>
+                {bill.history
+                  .slice()
+                  .reverse()
+                  .map((h, idx) => (
+                    <div className="tr" key={`${h.step}-${h.savedAt}-${idx}`}>
+                      <span>
+                        <b>#{h.step}</b>
+                      </span>
+                      <span>{bill.stages[h.step - 1]}</span>
+                      <span>{formatDate(h.savedAt || h.startedAt)}</span>
+                      <span>{formatDate(h.dueAt)}</span>
+                      <span>
+                        <span className="performer-tag">
+                          {h.performedBy || "System Baseline"}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </section>
+          </>
+        )}
       </main>
 
       {/* Manual Creation & Inspection Modals */}
@@ -1126,24 +1115,9 @@ function AppMain({ user, token, onLogout }) {
         />
       )}
 
-      {showNewPhotoModal && (
-        <NewPhotoModal
-          billId={bill.id}
-          stages={bill.stages}
-          currentStep={bill.currentStep}
-          ward={bill.ward}
-          onClose={() => setShowNewPhotoModal(false)}
-          onPhotoAdded={(newPhotos, newUrls) => {
-            setBill((prev) => ({
-              ...prev,
-              photos: newPhotos,
-              photoUrls: newUrls
-            }));
-            setToast("New site inspection photo attached!");
-          }}
-          fetchWithAuth={fetchWithAuth}
-        />
-      )}
+
+
+
 
       {toast && <div className="toast">{toast}</div>}
     </div>
@@ -1151,23 +1125,39 @@ function AppMain({ user, token, onLogout }) {
 }
 
 function App() {
-  const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("billing_user")) || null; } catch { return null; }
-  });
-  const [token, setToken] = useState(() => localStorage.getItem("billing_token") || null);
+  // Always require credentials every time: start with null (do NOT persist in localStorage)
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+
+  // Clear any existing stored credentials from older versions so every load prompts for login
+  useEffect(() => {
+    try {
+      localStorage.removeItem("billing_user");
+      localStorage.removeItem("billing_token");
+      sessionStorage.removeItem("billing_user");
+      sessionStorage.removeItem("billing_token");
+    } catch {
+      // ignore storage access errors
+    }
+  }, []);
 
   const handleLoginSuccess = useCallback((userData, authToken) => {
     setUser(userData);
     setToken(authToken);
-    localStorage.setItem("billing_user", JSON.stringify(userData));
-    localStorage.setItem("billing_token", authToken);
+    // Explicitly kept in memory only — not written to localStorage so refreshing/opening always asks for login
   }, []);
 
   const handleLogout = useCallback(() => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem("billing_user");
-    localStorage.removeItem("billing_token");
+    try {
+      localStorage.removeItem("billing_user");
+      localStorage.removeItem("billing_token");
+      sessionStorage.removeItem("billing_user");
+      sessionStorage.removeItem("billing_token");
+    } catch {
+      // ignore
+    }
   }, []);
 
   if (!user || !token) {

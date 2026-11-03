@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { API_BASE } from "./config";
 
 export default function TowerMasterView({
   towers = [],
@@ -53,7 +52,7 @@ export default function TowerMasterView({
     setFormError("");
 
     try {
-      const res = await fetchWithAuth(`${API_BASE}/towers`, {
+      const res = await fetchWithAuth("http://localhost:4000/api/towers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newTowerForm)

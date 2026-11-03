@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { API_BASE } from "./config";
+import { Pie, Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
 export default function ReportsModal({ onClose, fetchWithAuth, onSelectBill }) {
   const [data, setData] = useState(null);
@@ -8,7 +10,7 @@ export default function ReportsModal({ onClose, fetchWithAuth, onSelectBill }) {
 
   useEffect(() => {
     let mounted = true;
-    fetchWithAuth(`${API_BASE}/reports`)
+    fetchWithAuth("http://localhost:4000/api/reports")
       .then((res) => res.json())
       .then((rep) => {
         if (mounted) {
@@ -28,6 +30,57 @@ export default function ReportsModal({ onClose, fetchWithAuth, onSelectBill }) {
   const summary = data?.summary || {};
   const stageCounts = summary.stageCounts || {};
   const allBills = data?.bills || [];
+  // Compute client‑wise aggregation for charts
+  const clientTotals = {};
+  allBills.forEach(b => {
+    const client = b.client || b.clientName || b.towerName || 'BBMP';
+    const gross = b.grossAmount || parseFloat(String(b.formattedGross || b.amount || 0).replace(/[^0-9.-]+/g, '')) || 0;
+    clientTotals[client] = (clientTotals[client] || 0) + gross;
+  });
+  const clientPieData = {
+    labels: Object.keys(clientTotals),
+    datasets: [{
+      data: Object.values(clientTotals),
+      backgroundColor: ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#fdba74'],
+    }],
+  };
+  const clientBarData = {
+  // Bar chart data remains unchanged
+
+    labels: Object.keys(clientTotals),
+    datasets: [{
+      label: 'Gross Billed (₹)',
+      data: Object.values(clientTotals),
+      backgroundColor: '#34d399',
+    }],
+  };
+
+  // Pie chart options for enhanced design
+  const pieOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: {
+          font: { size: 14 },
+          color: '#e2e8f0',
+        },
+      },
+      tooltip: {
+        enabled: true,
+        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+        titleColor: '#f8fafc',
+        bodyColor: '#e2e8f0',
+        borderColor: '#475569',
+        borderWidth: 1,
+      },
+    },
+    layout: {
+      padding: { top: 10, bottom: 10, left: 10, right: 10 },
+    },
+    cutout: '0%',
+  };
 
   const filteredBills = statusFilter === "ALL"
     ? allBills
@@ -145,6 +198,12 @@ export default function ReportsModal({ onClose, fetchWithAuth, onSelectBill }) {
                   </button>
                 </div>
               </div>
+                {/* Client-wise Pie Chart */}
+                <div className="pie-chart-section" style={{ marginTop: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', borderRadius: '12px', padding: '16px' }}>
+                  <div style={{ width: '100%', height: '100%' }}>
+                    <Pie data={clientPieData} options={pieOptions} />
+                  </div>
+                </div>
 
               {/* Table of Bills */}
               <div className="reports-table-container">

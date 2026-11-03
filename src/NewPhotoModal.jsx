@@ -1,5 +1,4 @@
 import React, { useState, useRef } from "react";
-import { API_BASE } from "./config";
 
 export default function NewPhotoModal({ billId, stages = [], currentStep = 1, ward = "", onClose, onPhotoAdded, fetchWithAuth }) {
   const [photoMode, setPhotoMode] = useState("file"); // "file" | "url"
@@ -79,7 +78,7 @@ export default function NewPhotoModal({ billId, stages = [], currentStep = 1, wa
         geoTag: geoTag.trim()
       };
 
-      const res = await fetchWithAuth(`${API_BASE}/bills/${billId}/photos`, {
+      const res = await fetchWithAuth(`http://localhost:4000/api/bills/${billId}/photos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

@@ -5,6 +5,8 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { analyzePdfDocument } from "./pdfAnalyzer.js";
+import { WORKFLOW_CATEGORIES } from "../src/workflowMasterData.js";
+import { workflowEngine } from "./workflowEngine.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,10 +40,20 @@ function verifyPassword(password, storedHash) {
 // In-memory demo users store
 const users = [
   {
+    id: "usr_billing_tower",
+    username: "billing_tower",
+    email: "billing_tower@billing.gov",
+    passwordHash: hashPassword("#bill@2026"),
+    name: "Billing Tower Admin",
+    role: "System Administrator",
+    department: "Billing Operations & Governance Directorate",
+    badgeColor: "#2563eb"
+  },
+  {
     id: "usr_admin",
     username: "admin",
     email: "admin@billing.gov",
-    passwordHash: hashPassword("admin123"),
+    passwordHash: hashPassword("#bill@2026"),
     name: "Rajesh Kumar",
     role: "System Administrator",
     department: "Executive & Systems Directorate",
@@ -114,17 +126,20 @@ function requireAuth(req, res, next) {
 app.post("/api/auth/login", (req, res) => {
   const { identifier, password } = req.body;
   if (!identifier || !password) {
-    return res.status(400).json({ error: "Missing credentials" });
+    return res.status(400).json({ error: "Username and password are required." });
   }
 
-  const user = users.find(u => u.username === identifier || u.email === identifier);
+  const query = String(identifier).trim().toLowerCase();
+  const user = users.find(
+    (u) => u.username.toLowerCase() === query || u.email.toLowerCase() === query
+  );
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ error: "Invalid username or password" });
   }
 
   const token = createSession(user.id);
   const { passwordHash: _, ...safeUser } = user;
-  res.json({ user: safeUser, token });
+  res.json({ message: "Login successful", user: safeUser, token });
 });
 
 
@@ -562,24 +577,42 @@ function getDefaultSitePhotosForTower(towerId, projectName = "", ward = "") {
   return JSON.parse(JSON.stringify(SITE_INSPECTION_PHOTOS["TWR-101"]));
 }
 
-// Demo in-memory bills state covering every stage of the user's workflow:
-// DRAFT -> SUBMITTED -> UNDER_REVIEW -> (REJECTED_EDIT / INVOICE -> PAYMENT -> PAID -> CLOSED)
+// Demo in-memory bills state covering the organization's 34 workflows:
+// Reflecting Pilot 1 (BBMP Lakes North), Pilot 2 (BMRCL 80/20), KIADB, Victoria Hospital, KSMCL, KPTCL, Bowring
 const bills = new Map([
   [
     "BILL-1001",
     {
       id: "BILL-1001",
+      billNumber: "BBMP/LAKES/2026/091",
+      client: "BBMP",
+      unit: "BBMP Lakes North Zone",
+      workflowId: "WF-01-BBMP-LAKES",
+      isPilot: true,
+      pilotName: "Pilot 1: Municipal Engineering & Double Bill (15 Stages)",
       towerId: "TWR-101",
-      projectName: "BBMP Lakes Maintenance - Ward 42",
+      projectName: "Bellandur North Inflow Lake Desilting & Masonry Silt Weir",
       projectType: "BBMP_LAKES",
-      workflowStatus: "UNDER_REVIEW", // In REVIEW stage
+      workflowStatus: "UNDER_REVIEW",
       currentStep: 5,
+      currentRole: "Vigilance & Labour Cell",
+      currentPerson: "S. Natarajan (Labour Officer)",
+      slaStatus: "WITHIN_SLA",
+      daysInStage: 1,
+      stageSlaDays: 2,
+      workOrder: "WO/BBMP/2026/4102",
+      contract: "CNT-2025-BBMP-LAK-088",
+      billingPeriod: "01 Sep 2026 – 30 Sep 2026",
+      billingType: "Double Bill Route (DC Bill + DCF Fund Allocation)",
+      paymentStatus: "UNPAID",
+      submissionDate: new Date(Date.now() - 3600000 * 24 * 6).toISOString(),
+      expectedPaymentDate: new Date(Date.now() + 3600000 * 24 * 12).toISOString(),
       amount: "₹ 48,75,000",
       amountNum: 4875000,
       contractor: "Sri Sai Infratech Projects",
       ward: "Ward 42, Bellandur Lake Area",
       mbNumber: "MB-2026/042-A",
-      description: "Desilting, bund strengthening, weir restoration and inlet gate civil improvements.",
+      description: "Desilting, bund strengthening, masonry weir restoration and inlet gate civil improvements.",
       photos: JSON.parse(JSON.stringify(SITE_INSPECTION_PHOTOS["TWR-101"])),
       photoUrls: SITE_INSPECTION_PHOTOS["TWR-101"].map((p) => p.url),
       documents: [
@@ -590,7 +623,7 @@ const bills = new Map([
           size: 142850,
           uploadedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
           uploadedBy: "Dr. Priya Sharma (Field Officer (AEE))",
-          url: "/uploads/demo-measurement-book.pdf"
+          url: "http://localhost:4000/uploads/demo-measurement-book.pdf"
         },
         {
           id: "doc-sample-2",
@@ -599,33 +632,49 @@ const bills = new Map([
           size: 89400,
           uploadedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
           uploadedBy: "Anil Mehta (Accounts & Finance Lead)",
-          url: "/uploads/demo-estimate-boq.csv"
+          url: "http://localhost:4000/uploads/demo-estimate-boq.csv"
         }
       ],
       history: [
         {
           step: 1,
-          startedAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-          dueAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-          savedAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-          action: "Billing created & docketed under Tower TWR-101",
-          performedBy: "Dr. Priya Sharma (Field Officer (AEE))"
+          startedAt: new Date(Date.now() - 3600000 * 24 * 6).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
+          action: "Docketed in Central Tapal Inward Registry (#TPL-2026-8910)",
+          performedBy: "M. Ramesh (Tapal Clerk)"
         },
         {
           step: 2,
-          startedAt: new Date(Date.now() - 3600000 * 36).toISOString(),
-          dueAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-          savedAt: new Date(Date.now() - 3600000 * 36).toISOString(),
-          action: "Submitted for Departmental Review",
+          startedAt: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
+          action: "AE Field Measurements & Geo-tagged photo documentation verified in MB Book #MB-2026/042-A",
+          performedBy: "K. Venkatesh (Assistant Engineer)"
+        },
+        {
+          step: 3,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
+          action: "25% Statutory Check-Measurement executed and signed under KPWD Code Art. 219",
           performedBy: "Dr. Priya Sharma (Field Officer (AEE))"
         },
         {
+          step: 4,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
+          dueAt: new Date(Date.now() + 3600000 * 24 * 2).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
+          action: "Divisional Scrutiny completed and budget head concordance validated",
+          performedBy: "Rajesh Kumar (Executive Engineer)"
+        },
+        {
           step: 5,
-          startedAt: new Date(Date.now() - 3600000 * 6).toISOString(),
-          dueAt: new Date(Date.now() + 2 * 86400000).toISOString(),
+          startedAt: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
+          dueAt: new Date(Date.now() + 3600000 * 24 * 1).toISOString(),
           savedAt: new Date(Date.now() - 3600000 * 6).toISOString(),
-          action: "Currently In Review Queue for Executive Engineer Scrutiny",
-          performedBy: "Rajesh Kumar (System Administrator)"
+          action: "Currently undergoing Biometric Attendance & Form V Labour Welfare Muster scrutiny",
+          performedBy: "S. Natarajan (Labour Officer)"
         }
       ]
     }
@@ -634,39 +683,70 @@ const bills = new Map([
     "BILL-1002",
     {
       id: "BILL-1002",
+      billNumber: "BMRCL/PW-80/2026/044",
+      client: "BMRCL",
+      unit: "BMRCL Project Wing 80%",
+      workflowId: "WF-09-BMRCL-PROJECT",
+      isPilot: true,
+      pilotName: "Pilot 2: Transit Milestone (80% Operational Stream via CSO & GM Ops)",
       towerId: "TWR-102",
-      projectName: "Hebbal Lake Aeration Tower Expansion",
+      projectName: "Reach 3-C Elevated Metro Viaduct & Pier Cap Structural Works",
       projectType: "STANDARD",
-      workflowStatus: "REJECTED_EDIT", // In EDIT stage because Review was Rejected!
-      rejectionReason: "Measurement discrepancy in MB Book sheet 14. Bund compaction test report missing from lab certification.",
-      rejectedBy: "Anil Mehta (Accounts & Finance Lead)",
-      rejectedAt: new Date(Date.now() - 3600000 * 14).toISOString(),
-      currentStep: 3,
-      amount: "₹ 32,40,000",
-      amountNum: 3240000,
-      contractor: "Karnataka Water Infrastructure Ltd",
-      ward: "Ward 18, Hebbal",
-      mbNumber: "MB-2026/018-B",
-      description: "Installation of diffuse aeration pipelines, electrical sub-station transformer connection, and telemetry sensors.",
+      workflowStatus: "UNDER_REVIEW",
+      currentStep: 4,
+      currentRole: "GM Operations & E-Office",
+      currentPerson: "R. Chandrashekhar, KAS (GM Operations)",
+      slaStatus: "APPROACHING_SLA",
+      daysInStage: 2.5,
+      stageSlaDays: 3,
+      workOrder: "WO-BMRCL-772-R3C",
+      contract: "CNT-BMRCL-2024-EP104",
+      billingPeriod: "01 Aug 2026 – 31 Aug 2026 (Milestone 4)",
+      billingType: "Split Milestone Billing (80% Ops / 20% Retention)",
+      paymentStatus: "UNPAID",
+      submissionDate: new Date(Date.now() - 3600000 * 24 * 7).toISOString(),
+      expectedPaymentDate: new Date(Date.now() + 3600000 * 24 * 5).toISOString(),
+      amount: "₹ 1,25,00,000",
+      amountNum: 12500000,
+      contractor: "Karnataka Infrastructure & Metro Constr Ltd",
+      ward: "Reach 3-C Peenya-Jalahalli Corridor",
+      mbNumber: "MB-BMRCL-2026-991",
+      description: "80% milestone bill for pier structural casting, bearing installation, and viaduct segments.",
       photos: JSON.parse(JSON.stringify(SITE_INSPECTION_PHOTOS["TWR-102"])),
       photoUrls: SITE_INSPECTION_PHOTOS["TWR-102"].map((p) => p.url),
       documents: [],
       history: [
         {
           step: 1,
-          startedAt: new Date(Date.now() - 3600000 * 40).toISOString(),
-          dueAt: new Date(Date.now() - 3600000 * 20).toISOString(),
-          savedAt: new Date(Date.now() - 3600000 * 40).toISOString(),
-          action: "Billing created and submitted",
-          performedBy: "Dr. Priya Sharma (Field Officer (AEE))"
+          startedAt: new Date(Date.now() - 3600000 * 24 * 7).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 6).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 6).toISOString(),
+          action: "Bill submitted officially to CSO Office docketing desk",
+          performedBy: "Metro Safety Registrar"
+        },
+        {
+          step: 2,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 6).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 4).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 4).toISOString(),
+          action: "Safety & Site Inspection Clearance signed by Assistant Security/Civil Officer (ASCO)",
+          performedBy: "M. G. Suresh (ASCO Reach 3)"
         },
         {
           step: 3,
-          startedAt: new Date(Date.now() - 3600000 * 14).toISOString(),
-          dueAt: new Date(Date.now() + 86400000).toISOString(),
-          savedAt: new Date(Date.now() - 3600000 * 14).toISOString(),
-          action: "REJECTED in Review: Measurement discrepancy in MB Book sheet 14. Bund compaction test report missing. Routed to EDIT.",
-          performedBy: "Anil Mehta (Accounts & Finance Lead)"
+          startedAt: new Date(Date.now() - 3600000 * 24 * 4).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 2.5).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 2.5).toISOString(),
+          action: "Chief Security Officer formal operational concurrence issued",
+          performedBy: "Col. Sanjeev Varma (CSO BMRCL)"
+        },
+        {
+          step: 4,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 2.5).toISOString(),
+          dueAt: new Date(Date.now() + 3600000 * 12).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 2.5).toISOString(),
+          action: "In E-Office queue for General Manager (Operations) sanction",
+          performedBy: "R. Chandrashekhar, KAS (GM Operations)"
         }
       ]
     }
@@ -675,55 +755,56 @@ const bills = new Map([
     "BILL-1003",
     {
       id: "BILL-1003",
-      towerId: "TWR-103",
-      projectName: "Koramangala Valley Culvert 3 Desilting",
+      billNumber: "BMRCL/PW-20/2026/045",
+      client: "BMRCL",
+      unit: "BMRCL Project Wing 20%",
+      workflowId: "WF-09-BMRCL-PROJECT",
+      isPilot: true,
+      pilotName: "Pilot 2: Transit Milestone (20% Statutory HR Retention Stream)",
+      towerId: "TWR-102",
+      projectName: "Reach 3-C Viaduct Statutory Retention (20% Balance Release)",
       projectType: "STANDARD",
-      workflowStatus: "INVOICE", // In INVOICE stage (Approved from Review!)
-      currentStep: 8,
-      amount: "₹ 58,20,000",
-      amountNum: 5820000,
-      contractor: "Apex Urban Engineering Corp",
-      ward: "Ward 68, Koramangala",
-      mbNumber: "MB-2026/068-C",
-      description: "Deep channel hydraulic desilting, RCC retaining wall strengthening, and silt trap construction.",
-      invoiceData: {
-        invoiceNo: "INV-2026-BBMP-089",
-        invoiceDate: new Date(Date.now() - 3600000 * 8).toISOString(),
-        gross: 5820000,
-        gstTds: 116400,
-        itTds: 116400,
-        laborCess: 58200,
-        retention: 291000,
-        totalDeductions: 582000,
-        netPayable: 5238000
-      },
-      photos: JSON.parse(JSON.stringify(SITE_INSPECTION_PHOTOS["TWR-103"])),
-      photoUrls: SITE_INSPECTION_PHOTOS["TWR-103"].map((p) => p.url),
+      workflowStatus: "UNDER_REVIEW",
+      currentStep: 2,
+      currentRole: "HR Manager & Statutory Cell",
+      currentPerson: "Kavita Rao (Senior Manager HR)",
+      slaStatus: "BREACHED_SLA",
+      daysInStage: 5,
+      stageSlaDays: 2,
+      overdueDays: 3,
+      flagReason: "Pending statutory EPF ECR scroll reconciliation for 142 subcontracted workers.",
+      workOrder: "WO-BMRCL-772-RET",
+      contract: "CNT-BMRCL-2024-EP104",
+      billingPeriod: "Statutory Retention Period (20% Release)",
+      billingType: "Statutory Retention & Security Deposit Release",
+      paymentStatus: "OVERDUE",
+      submissionDate: new Date(Date.now() - 3600000 * 24 * 9).toISOString(),
+      expectedPaymentDate: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+      amount: "₹ 31,25,000",
+      amountNum: 3125000,
+      contractor: "Karnataka Infrastructure & Metro Constr Ltd",
+      ward: "Reach 3-C Peenya-Jalahalli Corridor",
+      mbNumber: "MB-BMRCL-2026-991/RET",
+      description: "20% statutory retention release conditional on EPF/ESI and minimum wage compliance certificates.",
+      photos: JSON.parse(JSON.stringify(SITE_INSPECTION_PHOTOS["TWR-102"])),
+      photoUrls: SITE_INSPECTION_PHOTOS["TWR-102"].map((p) => p.url),
       documents: [],
       history: [
         {
           step: 1,
-          startedAt: new Date(Date.now() - 3600000 * 60).toISOString(),
-          dueAt: new Date(Date.now() - 3600000 * 40).toISOString(),
-          savedAt: new Date(Date.now() - 3600000 * 60).toISOString(),
-          action: "Billing created & submitted",
-          performedBy: "Dr. Priya Sharma"
+          startedAt: new Date(Date.now() - 3600000 * 24 * 9).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 7).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 7).toISOString(),
+          action: "20% Retention bill dossier received with initial statutory declarations",
+          performedBy: "HR Compliance Officer"
         },
         {
-          step: 7,
-          startedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-          dueAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-          savedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-          action: "APPROVED in Review by Joint Commissioner & Executive Engineer",
-          performedBy: "Rajesh Kumar (System Administrator)"
-        },
-        {
-          step: 8,
-          startedAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-          dueAt: new Date(Date.now() + 86400000).toISOString(),
-          savedAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-          action: "Tax Invoice #INV-2026-BBMP-089 Generated. Net Payable: ₹ 52,38,000. Ready for Payment.",
-          performedBy: "Anil Mehta (Accounts & Finance Lead)"
+          step: 2,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 7).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 7).toISOString(),
+          action: "BREACHED SLA: HR Manager verification stalled. 142 labour EPF challans mismatch site muster.",
+          performedBy: "Kavita Rao (Senior Manager HR)"
         }
       ]
     }
@@ -732,47 +813,60 @@ const bills = new Map([
     "BILL-1004",
     {
       id: "BILL-1004",
-      towerId: "TWR-104",
-      projectName: "Yelahanka Wetland Bio-Fencing & Ecology Tower",
-      projectType: "BBMP_LAKES",
-      workflowStatus: "PAID", // In PAID stage (Payment confirmed, ready to Close)
-      currentStep: 12,
-      amount: "₹ 42,00,000",
-      amountNum: 4200000,
-      contractor: "GreenTech Eco Solutions",
-      ward: "Ward 05, Yelahanka",
-      mbNumber: "MB-2026/005-E",
-      description: "Native wetland planting, bio-fencing perimeter, solar power installation on monitoring mast.",
-      invoiceData: {
-        invoiceNo: "INV-2026-BBMP-044",
-        invoiceDate: new Date(Date.now() - 3600000 * 48).toISOString(),
-        gross: 4200000,
-        gstTds: 84000,
-        itTds: 84000,
-        laborCess: 42000,
-        retention: 210000,
-        totalDeductions: 420000,
-        netPayable: 3780000
-      },
-      paymentData: {
-        utrNumber: "SBIN2026092688419",
-        paidDate: new Date(Date.now() - 3600000 * 4).toISOString(),
-        paymentMode: "RTGS Electronic Clearing",
-        bankName: "State Bank of India - BBMP Treasury Branch",
-        amountPaid: 3780000,
-        voucherId: "VCH-2026-00921"
-      },
-      photos: JSON.parse(JSON.stringify(SITE_INSPECTION_PHOTOS["TWR-104"])),
-      photoUrls: SITE_INSPECTION_PHOTOS["TWR-104"].map((p) => p.url),
+      billNumber: "KIADB/HARO/2026/019",
+      client: "KIADB",
+      unit: "KIADB Harohalli Industrial Area",
+      workflowId: "WF-17-KIADB-HAROHALLI",
+      towerId: "TWR-103",
+      projectName: "Harohalli Phase 2 Industrial Effluent Pipeline & Road Resurfacing",
+      projectType: "STANDARD",
+      workflowStatus: "UNDER_REVIEW",
+      currentStep: 6,
+      currentRole: "Development Commissioner (DC)",
+      currentPerson: "Dr. Manjunath Swamy, IAS (DC KIADB)",
+      slaStatus: "APPROACHING_SLA",
+      daysInStage: 2,
+      stageSlaDays: 3,
+      workOrder: "WO-KIADB-2025-081",
+      contract: "CNT-KIADB-2025-HARO-019",
+      billingPeriod: "01 Aug 2026 – 31 Aug 2026",
+      billingType: "Monthly Running Account (RA) Bill",
+      paymentStatus: "UNPAID",
+      submissionDate: new Date(Date.now() - 3600000 * 24 * 11).toISOString(),
+      expectedPaymentDate: new Date(Date.now() + 3600000 * 24 * 4).toISOString(),
+      amount: "₹ 64,50,000",
+      amountNum: 6450000,
+      contractor: "Apex Urban Engineering Corp",
+      ward: "Harohalli Industrial Area Sector 2",
+      mbNumber: "MB-KIADB-2026-081",
+      description: "HDPE effluent transmission pipeline, RCC storm drain culverts, and asphalt paving.",
+      photos: JSON.parse(JSON.stringify(SITE_INSPECTION_PHOTOS["TWR-103"])),
+      photoUrls: SITE_INSPECTION_PHOTOS["TWR-103"].map((p) => p.url),
       documents: [],
       history: [
         {
-          step: 12,
-          startedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-          dueAt: new Date(Date.now() + 86400000).toISOString(),
-          savedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-          action: "Payment Disbursed via RTGS. UTR #SBIN2026092688419. Amount: ₹ 37,80,000",
-          performedBy: "Anil Mehta (Accounts & Finance Lead)"
+          step: 1,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 11).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 10).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 10).toISOString(),
+          action: "Tapal inward registration at KIADB DO-EE1 Office",
+          performedBy: "Inward Section"
+        },
+        {
+          step: 5,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 4).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+          action: "Head Office General Manager clearance issued",
+          performedBy: "GM Industrial Areas"
+        },
+        {
+          step: 6,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+          dueAt: new Date(Date.now() + 3600000 * 24 * 1).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+          action: "In queue for Development Commissioner executive sanction",
+          performedBy: "Dr. Manjunath Swamy, IAS"
         }
       ]
     }
@@ -781,28 +875,62 @@ const bills = new Map([
     "BILL-1005",
     {
       id: "BILL-1005",
+      billNumber: "BMCRI/VIC/2026/088",
+      client: "BMCRI",
+      unit: "Victoria Hospital Housekeeping & Security",
+      workflowId: "WF-06-VICTORIA-HOSPITAL",
       towerId: "TWR-105",
-      projectName: "Whitefield Sluice Gate Automation Overhaul",
+      projectName: "Victoria Hospital Trauma & Emergency Wards Deep Sanitation",
       projectType: "STANDARD",
-      workflowStatus: "SUBMITTED", // Freshly SUBMITTED, awaiting review pickup
-      currentStep: 2,
-      amount: "₹ 24,80,000",
-      amountNum: 2480000,
+      workflowStatus: "UNDER_REVIEW",
+      currentStep: 12,
+      currentRole: "Chief Accounts Officer (CAO)",
+      currentPerson: "G. Shivarudraiah (CAO BMCRI)",
+      slaStatus: "BREACHED_SLA",
+      daysInStage: 6,
+      stageSlaDays: 3,
+      overdueDays: 3,
+      flagReason: "Rate parity dispute between vendor quote and Karnataka State Medical Supplies Corporation schedule.",
+      workOrder: "WO-BMCRI-2026-VIC-09",
+      contract: "CNT-BMCRI-2025-HOSP-012",
+      billingPeriod: "01 Sep 2026 – 30 Sep 2026",
+      billingType: "Monthly Running Account (RA) Bill",
+      paymentStatus: "OVERDUE",
+      submissionDate: new Date(Date.now() - 3600000 * 24 * 18).toISOString(),
+      expectedPaymentDate: new Date(Date.now() - 3600000 * 24 * 4).toISOString(),
+      amount: "₹ 38,90,000",
+      amountNum: 3890000,
       contractor: "Vanguard Infra Ventures",
-      ward: "Ward 84, Mahadevapura",
-      mbNumber: "MB-2026/084-F",
-      description: "Hydraulic actuator replacement, sensor calibration, and telemetry gateway commissioning.",
+      ward: "Victoria Hospital Fort Campus",
+      mbNumber: "MB-MED-2026-VIC-09",
+      description: "ICU ward bio-sanitation, bio-medical waste segregation and 24x7 security personnel deployment.",
       photos: JSON.parse(JSON.stringify(SITE_INSPECTION_PHOTOS["TWR-105"])),
       photoUrls: SITE_INSPECTION_PHOTOS["TWR-105"].map((p) => p.url),
       documents: [],
       history: [
         {
-          step: 2,
-          startedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-          dueAt: new Date(Date.now() + 86400000).toISOString(),
-          savedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-          action: "Billing dossier submitted officially. Ready for Technical Scrutiny.",
-          performedBy: "Dr. Priya Sharma (Field Officer (AEE))"
+          step: 1,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 18).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 17).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 17).toISOString(),
+          action: "Hospital Tapal inward recorded",
+          performedBy: "Registry Clerk"
+        },
+        {
+          step: 4,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 14).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 12).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 12).toISOString(),
+          action: "Nursing Matron Ward Cleanliness Certificate endorsed",
+          performedBy: "Sister Stella (Matron)"
+        },
+        {
+          step: 12,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 6).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 6).toISOString(),
+          action: "BREACHED SLA: CAO audit calculation delayed over chemical disinfectant unit price parity",
+          performedBy: "G. Shivarudraiah (CAO)"
         }
       ]
     }
@@ -811,49 +939,174 @@ const bills = new Map([
     "BILL-1006",
     {
       id: "BILL-1006",
+      billNumber: "KSMCL/MINES/2026/012",
+      client: "KSMCL",
+      unit: "KSMCL Mineral Exploration & Mining Areas",
+      workflowId: "WF-23-KSMCL",
       towerId: "TWR-101",
-      projectName: "Bellandur Inflow Silt Weir Phase 1 (Completed)",
-      projectType: "BBMP_LAKES",
-      workflowStatus: "CLOSED", // Fully CLOSED lifecycle
-      currentStep: 12,
-      amount: "₹ 65,00,000",
-      amountNum: 6500000,
+      projectName: "Sandur Subbarayanahalli Iron Ore Weighbridge & Perimeter Security",
+      projectType: "STANDARD",
+      workflowStatus: "PAID",
+      currentStep: 9,
+      currentRole: "Treasury & Disbursements",
+      currentPerson: "SBI State Treasury Branch",
+      slaStatus: "WITHIN_SLA",
+      daysInStage: 0,
+      stageSlaDays: 1,
+      workOrder: "WO-KSMCL-2026-SANDUR-004",
+      contract: "CNT-KSMCL-2024-MIN-007",
+      billingPeriod: "01 Aug 2026 – 31 Aug 2026",
+      billingType: "Monthly Running Account (RA) Bill",
+      paymentStatus: "PAID",
+      submissionDate: new Date(Date.now() - 3600000 * 24 * 22).toISOString(),
+      expectedPaymentDate: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+      amount: "₹ 84,20,000",
+      amountNum: 8420000,
       contractor: "Sri Sai Infratech Projects",
-      ward: "Ward 42, Bellandur",
-      mbNumber: "MB-2025/042-Z",
-      description: "Completed masonry weir construction, boulder pitching, and permanent discharge spillway.",
+      ward: "Sandur Mining Division",
+      mbNumber: "MB-MINE-2026-004",
+      description: "Armed security for ore weighbridges, perimeter solar fencing, and mineral transport check-posts.",
       invoiceData: {
-        invoiceNo: "INV-2025-BBMP-992",
-        invoiceDate: new Date(Date.now() - 3600000 * 24 * 30).toISOString(),
-        gross: 6500000,
-        gstTds: 130000,
-        itTds: 130000,
-        laborCess: 65000,
-        retention: 325000,
-        totalDeductions: 650000,
-        netPayable: 5850000
+        invoiceNo: "INV-2026-KSMCL-012",
+        invoiceDate: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
+        gross: 8420000,
+        gstTds: 168400,
+        itTds: 168400,
+        laborCess: 84200,
+        retention: 421000,
+        totalDeductions: 842000,
+        netPayable: 7578000
       },
       paymentData: {
-        utrNumber: "SBIN2025112001928",
-        paidDate: new Date(Date.now() - 3600000 * 24 * 25).toISOString(),
-        paymentMode: "RTGS Electronic Clearing",
-        bankName: "State Bank of India - BBMP Treasury Branch",
-        amountPaid: 5850000,
-        voucherId: "VCH-2025-00781"
+        utrNumber: "SBIN2026101299831",
+        paidDate: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+        paymentMode: "RTGS Electronic Bank Transfer",
+        bankName: "State Bank of India - Mining Corporate Account",
+        amountPaid: 7578000,
+        voucherId: "VCH-2026-KSMCL-0012"
       },
-      closedAt: new Date(Date.now() - 3600000 * 24 * 20).toISOString(),
-      closedBy: "Rajesh Kumar (System Administrator)",
       photos: JSON.parse(JSON.stringify(SITE_INSPECTION_PHOTOS["TWR-106"])),
       photoUrls: SITE_INSPECTION_PHOTOS["TWR-106"].map((p) => p.url),
       documents: [],
       history: [
         {
-          step: 12,
-          startedAt: new Date(Date.now() - 3600000 * 24 * 20).toISOString(),
-          dueAt: new Date(Date.now() - 3600000 * 24 * 20).toISOString(),
-          savedAt: new Date(Date.now() - 3600000 * 24 * 20).toISOString(),
-          action: "FILE PERMANENTLY CLOSED & SEALED. Statutory audit and reconciliation finished.",
-          performedBy: "Rajesh Kumar (System Administrator)"
+          step: 9,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+          action: "Payment completed via RTGS #SBIN2026101299831. Amount: ₹ 75,78,000",
+          performedBy: "Anil Mehta (Accounts & Finance Lead)"
+        }
+      ]
+    }
+  ],
+  [
+    "BILL-1007",
+    {
+      id: "BILL-1007",
+      billNumber: "KPTCL/TL/2026/033",
+      client: "KPTCL",
+      unit: "KPTCL Transmission Sub-Stations Wing",
+      workflowId: "WF-22-KPTCL",
+      towerId: "TWR-104",
+      projectName: "220kV Yelahanka-Hebbal Major Sub-station Perimeter Security",
+      projectType: "STANDARD",
+      workflowStatus: "UNDER_REVIEW",
+      currentStep: 3,
+      currentRole: "Administrative Officer",
+      currentPerson: "M. B. Patil (Zonal AO)",
+      slaStatus: "WITHIN_SLA",
+      daysInStage: 1,
+      stageSlaDays: 2,
+      workOrder: "WO-KPTCL-2026-YEL-033",
+      contract: "CNT-KPTCL-2025-SUB-041",
+      billingPeriod: "01 Sep 2026 – 30 Sep 2026",
+      billingType: "Monthly Running Account (RA) Bill",
+      paymentStatus: "UNPAID",
+      submissionDate: new Date(Date.now() - 3600000 * 24 * 4).toISOString(),
+      expectedPaymentDate: new Date(Date.now() + 3600000 * 24 * 8).toISOString(),
+      amount: "₹ 29,80,000",
+      amountNum: 2980000,
+      contractor: "GreenTech Eco Solutions",
+      ward: "Yelahanka 220kV Substation",
+      mbNumber: "MB-KPTCL-2026-033",
+      description: "Sub-station yard perimeter security guards, shift muster, and thermal camera patrol.",
+      photos: JSON.parse(JSON.stringify(SITE_INSPECTION_PHOTOS["TWR-104"])),
+      photoUrls: SITE_INSPECTION_PHOTOS["TWR-104"].map((p) => p.url),
+      documents: [],
+      history: [
+        {
+          step: 1,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 4).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
+          action: "Tapal inward completed at KPTCL Zonal Office",
+          performedBy: "Zonal Inward Section"
+        },
+        {
+          step: 3,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
+          dueAt: new Date(Date.now() + 3600000 * 24 * 1).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
+          action: "Administrative Officer scrutinizing shift guard muster rolls",
+          performedBy: "M. B. Patil (Zonal AO)"
+        }
+      ]
+    }
+  ],
+  [
+    "BILL-1008",
+    {
+      id: "BILL-1008",
+      billNumber: "BOWRING/HK/2026/015",
+      client: "Bowring Hospital",
+      unit: "Bowring & Lady Curzon Hospital and Gosha",
+      workflowId: "WF-13-BOWRING-HOSPITAL",
+      towerId: "TWR-105",
+      projectName: "Bowring Hospital In-patient Wards Deep Sanitation & Hygiene Services",
+      projectType: "STANDARD",
+      workflowStatus: "REJECTED_EDIT",
+      rejectionReason: "Discrepancy in biometric muster count (128 certified) vs EPF/ESI payment challan (114 listed). Revised challan and explanatory reconciliation statement required from vendor.",
+      rejectedBy: "Anil Mehta (Accounts & Finance Lead)",
+      rejectedAt: new Date(Date.now() - 3600000 * 18).toISOString(),
+      currentStep: 7,
+      currentRole: "Case Worker (Return Queue)",
+      currentPerson: "Deepa Hegde (Case Worker)",
+      slaStatus: "BREACHED_SLA",
+      daysInStage: 2,
+      stageSlaDays: 2,
+      workOrder: "WO-BOWRING-2026-015",
+      contract: "CNT-BOWRING-2025-SAN-003",
+      billingPeriod: "01 Sep 2026 – 30 Sep 2026",
+      billingType: "Monthly Running Account (RA) Bill",
+      paymentStatus: "OVERDUE",
+      submissionDate: new Date(Date.now() - 3600000 * 24 * 14).toISOString(),
+      expectedPaymentDate: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
+      amount: "₹ 22,10,000",
+      amountNum: 2210000,
+      contractor: "Vanguard Infra Ventures",
+      ward: "Bowring Hospital Shivajinagar Campus",
+      mbNumber: "MB-MED-2026-BOW-15",
+      description: "General and maternity wards housekeeping, OT disinfection and clinical linen laundry.",
+      photos: JSON.parse(JSON.stringify(SITE_INSPECTION_PHOTOS["TWR-105"])),
+      photoUrls: SITE_INSPECTION_PHOTOS["TWR-105"].map((p) => p.url),
+      documents: [],
+      history: [
+        {
+          step: 1,
+          startedAt: new Date(Date.now() - 3600000 * 24 * 14).toISOString(),
+          dueAt: new Date(Date.now() - 3600000 * 24 * 13).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 24 * 13).toISOString(),
+          action: "Tapal inward recorded",
+          performedBy: "Registry"
+        },
+        {
+          step: 7,
+          startedAt: new Date(Date.now() - 3600000 * 18).toISOString(),
+          dueAt: new Date(Date.now() + 3600000 * 24 * 1).toISOString(),
+          savedAt: new Date(Date.now() - 3600000 * 18).toISOString(),
+          action: "RETURNED / REJECTED in Review: EPF/ESI shortfall for 14 staff. Routed to EDIT.",
+          performedBy: "Anil Mehta (Accounts & Finance Lead)"
         }
       ]
     }
@@ -861,35 +1114,404 @@ const bills = new Map([
 ]);
 
 function stagesFor(bill) {
+  if (bill && bill.workflowId) {
+    const wf = workflowEngine.getWorkflowById(bill.workflowId);
+    if (wf && wf.stages && wf.stages.length > 0) return wf.stages.map((s) => s.name);
+  }
   return workflows[bill.projectType] || workflows.STANDARD;
 }
 
-// Auth endpoints
-app.post("/api/auth/login", (req, res) => {
-  const { identifier, password } = req.body;
-  if (!identifier || !password) {
-    return res.status(400).json({ error: "Username/email and password are required." });
+function getWorkflowForBill(bill) {
+  if (bill && bill.workflowId) {
+    return workflowEngine.getWorkflowById(bill.workflowId) || null;
+  }
+  return null;
+}
+
+// ============================================================
+// 6. WORKFLOW TRACKING & CANONICAL 5-PHASE JOURNEY MAPPING
+// Requirement:
+// "Each bill shall display its complete journey:
+//  Submission → Approval stages → Finance → Audit, where applicable → Payment
+//  The system shall show:
+//  Completed stages, Current stage, Pending stage, Date entered into stage,
+//  Days pending, SLA, SLA status, Next stage"
+// ============================================================
+
+function getCanonicalPhase(stageName = "", step = 1, total = 12) {
+  const s = (stageName || "").toLowerCase();
+  if (
+    step === 1 ||
+    s.includes("tapal") ||
+    s.includes("inward") ||
+    s.includes("docket") ||
+    s.includes("submission") ||
+    s.includes("registry") ||
+    s.includes("bill to cso")
+  ) {
+    return { id: "submission", label: "Submission", shortLabel: "Submission", icon: "📥", order: 1 };
+  }
+  if (
+    step === total ||
+    s.includes("payment") ||
+    s.includes("disburse") ||
+    s.includes("cheque") ||
+    s.includes("rtgs") ||
+    s.includes("remittance") ||
+    s.includes("treasury payment") ||
+    s.includes("fund release") ||
+    s.includes("closure")
+  ) {
+    return { id: "payment", label: "Payment", shortLabel: "Payment", icon: "💳", order: 5 };
+  }
+  if (
+    s.includes("audit") ||
+    s.includes("pre-audit") ||
+    s.includes("dc bill") ||
+    s.includes("reconciliation") ||
+    s.includes("scrutiny sheet") ||
+    s.includes("audit cert") ||
+    s.includes("audit approval")
+  ) {
+    return { id: "audit", label: "Audit, where applicable", shortLabel: "Audit", icon: "🛡️", order: 4 };
+  }
+  if (
+    s.includes("finance") ||
+    s.includes("dcf") ||
+    s.includes("account") ||
+    s.includes("fa") ||
+    s.includes("cao") ||
+    s.includes("agm finance") ||
+    s.includes("budget") ||
+    s.includes("cash section") ||
+    s.includes("wage") ||
+    s.includes("tax") ||
+    s.includes("retention")
+  ) {
+    return { id: "finance", label: "Finance", shortLabel: "Finance", icon: "💰", order: 3 };
+  }
+  return { id: "approval", label: "Approval stages", shortLabel: "Approval stages", icon: "✍️", order: 2 };
+}
+
+function getWorkflowTrackingData(b) {
+  if (!b) return null;
+  const stages = stagesFor(b);
+  const totalSteps = stages.length;
+  const currentStep = Math.min(Math.max(b.currentStep || 1, 1), totalSteps);
+
+  // 4. Date entered into stage
+  let dateEnteredIntoStage = b.dateEnteredIntoStage;
+  if (!dateEnteredIntoStage) {
+    const curHist = (b.history || []).slice().reverse().find((h) => h.step === currentStep);
+    if (curHist && (curHist.startedAt || curHist.savedAt)) {
+      dateEnteredIntoStage = curHist.startedAt || curHist.savedAt;
+    } else if (b.submissionDate) {
+      const elapsedDays = Math.max(1, (currentStep - 1) * 2);
+      const subMs = new Date(b.submissionDate).getTime();
+      dateEnteredIntoStage = new Date(subMs + elapsedDays * 86400000).toISOString();
+    } else {
+      dateEnteredIntoStage = new Date().toISOString();
+    }
   }
 
-  const query = identifier.trim().toLowerCase();
-  const user = users.find(
-    (u) => u.email.toLowerCase() === query || u.username.toLowerCase() === query
+  // 5. Days pending
+  let daysPending = b.daysInStage !== undefined ? b.daysInStage : b.daysPending;
+  if (daysPending === undefined || daysPending === null) {
+    const diffMs = Math.max(0, Date.now() - new Date(dateEnteredIntoStage).getTime());
+    daysPending = Math.round((diffMs / 86400000) * 10) / 10;
+  }
+  daysPending = Number(daysPending) || 0;
+
+  // 6. SLA
+  const currentStageName = stages[currentStep - 1] || `Step ${currentStep}`;
+  const stageSlaDays = Number(b.stageSlaDays) || 2;
+  const slaText = `${stageSlaDays} Day${stageSlaDays > 1 ? "s" : ""} (${stageSlaDays * 24}h)`;
+
+  // 7. SLA status
+  let slaStatus = b.slaStatus;
+  if (!slaStatus) {
+    if (daysPending > stageSlaDays) slaStatus = "BREACHED_SLA";
+    else if (daysPending >= stageSlaDays * 0.75) slaStatus = "APPROACHING_SLA";
+    else slaStatus = "WITHIN_SLA";
+  }
+
+  const slaPercentageConsumed = Math.min(
+    200,
+    Math.round((daysPending / Math.max(1, stageSlaDays)) * 100)
   );
 
-  if (!user || !verifyPassword(password, user.passwordHash)) {
-    return res.status(401).json({ error: "Invalid username/email or password." });
+  // 1. Completed stages
+  const completedStages = [];
+  for (let i = 0; i < currentStep - 1; i++) {
+    const stepNum = i + 1;
+    const name = stages[i];
+    const ph = getCanonicalPhase(name, stepNum, totalSteps);
+    const hist = (b.history || []).find((h) => h.step === stepNum);
+    completedStages.push({
+      step: stepNum,
+      name,
+      phaseId: ph.id,
+      phaseLabel: ph.label,
+      phaseIcon: ph.icon,
+      completedAt: hist?.savedAt || hist?.dueAt || null,
+      authorizedBy: hist?.performedBy || "Verified Authority"
+    });
   }
 
-  const token = createSession(user.id);
-  const { passwordHash: _, ...safeUser } = user;
+  // 2. Current stage
+  const curPhase = getCanonicalPhase(currentStageName, currentStep, totalSteps);
+  const currentStage = {
+    step: currentStep,
+    name: currentStageName,
+    role: b.currentRole || "Assigned Officer",
+    person: b.currentPerson || "Responsible Authority",
+    phaseId: curPhase.id,
+    phaseLabel: curPhase.label,
+    phaseIcon: curPhase.icon,
+    dateEntered: dateEnteredIntoStage,
+    daysPending,
+    slaDays: stageSlaDays,
+    slaText,
+    slaStatus,
+    slaPercentageConsumed
+  };
 
-  res.json({
-    message: "Login successful",
-    token,
-    user: safeUser
+  // 3. Pending stage
+  const pendingStage = {
+    step: currentStep,
+    name: currentStageName,
+    role: b.currentRole || "Pending Review Authority",
+    status: "AWAITING_CLEARANCE",
+    phaseLabel: curPhase.label,
+    remainingStagesCount: totalSteps - currentStep + 1
+  };
+
+  // 8. Next stage
+  let nextStage = null;
+  if (currentStep < totalSteps) {
+    const nextStep = currentStep + 1;
+    const nextName = stages[nextStep - 1];
+    const nextPh = getCanonicalPhase(nextName, nextStep, totalSteps);
+    nextStage = {
+      step: nextStep,
+      name: nextName,
+      phaseId: nextPh.id,
+      phaseLabel: nextPh.label,
+      role: "Next Reviewing Authority",
+      slaDays: 2,
+      isFinal: nextStep === totalSteps
+    };
+  } else {
+    nextStage = {
+      step: totalSteps,
+      name: "Disbursement & File Closure",
+      phaseId: "payment",
+      phaseLabel: "Payment",
+      role: "Treasury Officer",
+      slaDays: 1,
+      isFinal: true
+    };
+  }
+
+  // 5 Canonical Journey Phases summary:
+  // Submission → Approval stages → Finance → Audit, where applicable → Payment
+  const canonicalBuckets = [
+    { id: "submission", label: "Submission", icon: "📥", stages: [] },
+    { id: "approval", label: "Approval stages", icon: "✍️", stages: [] },
+    { id: "finance", label: "Finance", icon: "💰", stages: [] },
+    { id: "audit", label: "Audit, where applicable", icon: "🛡️", stages: [] },
+    { id: "payment", label: "Payment", icon: "💳", stages: [] }
+  ];
+
+  stages.forEach((name, idx) => {
+    const sNum = idx + 1;
+    const ph = getCanonicalPhase(name, sNum, totalSteps);
+    const target = canonicalBuckets.find((c) => c.id === ph.id) || canonicalBuckets[1];
+    target.stages.push({
+      step: sNum,
+      name,
+      completed: sNum < currentStep,
+      active: sNum === currentStep,
+      pending: sNum > currentStep
+    });
   });
-});
 
+  const journeyPhases = canonicalBuckets.map((ph) => {
+    const totalCount = ph.stages.length;
+    if (totalCount === 0) {
+      return {
+        ...ph,
+        isApplicable: false,
+        status: "NOT_APPLICABLE",
+        statusLabel: "Not Required",
+        completedCount: 0,
+        totalCount: 0
+      };
+    }
+    const completedCount = ph.stages.filter((s) => s.completed).length;
+    const hasActive = ph.stages.some((s) => s.active);
+    let status = "PENDING";
+    let statusLabel = "Pending";
+    if (completedCount === totalCount) {
+      status = "COMPLETED";
+      statusLabel = "Completed ✓";
+    } else if (hasActive) {
+      status = "CURRENT";
+      statusLabel = "In Progress ●";
+    }
+
+    return {
+      ...ph,
+      isApplicable: true,
+      status,
+      statusLabel,
+      completedCount,
+      totalCount
+    };
+  });
+
+  return {
+    billId: b.id,
+    billNumber: b.billNumber || b.id,
+    projectName: b.projectName,
+    client: b.client || "BBMP",
+    unit: b.unit || b.ward || "Municipal Unit",
+    totalStages: totalSteps,
+    progressPercentage: Math.round(((currentStep - 1) / totalSteps) * 100),
+    completedStages,
+    completedStagesCount: completedStages.length,
+    currentStage,
+    pendingStage,
+    pendingStagesCount: totalSteps - currentStep + 1,
+    dateEnteredIntoStage,
+    daysPending,
+    sla: slaText,
+    stageSlaDays,
+    slaStatus,
+    slaPercentageConsumed,
+    nextStage,
+    journeyPhases
+  };
+}
+
+// ============================================================
+// 5. BILL MASTER / TRANSACTION HELPER
+// Enforces minimum proposed information:
+// 1. Bill ID (Unique)
+// 2. Bill number
+// 3. Client
+// 4. Unit
+// 5. Work Order
+// 6. Contract
+// 7. Billing period
+// 8. Billing type
+// 9. Bill amount
+// 10. Submission date
+// 11. Expected payment date
+// 12. Current stage
+// 13. Current responsible person/role
+// 14. Status
+// 15. Payment status
+// + 6. Complete Workflow Tracking Parameters
+// ============================================================
+function getBillMasterRecord(b) {
+  if (!b) return null;
+  const tower = towers.get(b.towerId);
+  const stages = stagesFor(b);
+  const currentStep = b.currentStep || 1;
+  const currentStageName = stages[currentStep - 1] || `Step ${currentStep}`;
+  const currentRole = b.currentRole || (stages[currentStep - 1] || "Officer");
+  const currentPerson = b.currentPerson || "Assigned Officer";
+
+  // Derive payment status if not explicitly set
+  let paymentStatus = b.paymentStatus;
+  if (!paymentStatus) {
+    if (b.workflowStatus === "PAID" || b.workflowStatus === "CLOSED" || b.paymentData) {
+      paymentStatus = "PAID";
+    } else if (b.workflowStatus === "PAYMENT" || b.workflowStatus === "PAYMENT_PENDING") {
+      paymentStatus = "PROCESSING";
+    } else if (b.expectedPaymentDate && new Date(b.expectedPaymentDate).getTime() < Date.now()) {
+      paymentStatus = "OVERDUE";
+    } else {
+      paymentStatus = "UNPAID";
+    }
+  }
+
+  // Calculate 6. Workflow Tracking
+  const workflowTracking = getWorkflowTrackingData(b);
+
+  return {
+    // === 15 MANDATORY PROPOSED INFORMATION FIELDS ===
+    id: b.id, // 1. Bill ID (Unique)
+    billNumber: b.billNumber || b.id, // 2. Bill number
+    client: b.client || "BBMP", // 3. Client
+    unit: b.unit || b.ward || "Municipal Unit", // 4. Unit
+    workOrder: b.workOrder || b.workOrderNo || "WO/BBMP/2026/001", // 5. Work Order
+    contract: b.contract || b.contractNo || "CNT-2025-GEN-001", // 6. Contract
+    billingPeriod: b.billingPeriod || "Current RA Period", // 7. Billing period
+    billingType: b.billingType || "Monthly Running Account (RA) Bill", // 8. Billing type
+    amount: b.amount || "₹ 35,00,000", // 9. Bill amount
+    amountNum: b.amountNum || parseCurrency(b.amount),
+    submissionDate: b.submissionDate || new Date().toISOString(), // 10. Submission date
+    expectedPaymentDate: b.expectedPaymentDate || null, // 11. Expected payment date
+    currentStage: currentStageName, // 12. Current stage
+    currentStageName,
+    currentStep,
+    totalSteps: stages.length,
+    currentRole, // 13. Current responsible person/role
+    currentPerson,
+    responsiblePersonRole: `${currentPerson} (${currentRole})`,
+    workflowStatus: b.workflowStatus || "UNDER_REVIEW", // 14. Status
+    status: b.workflowStatus || "UNDER_REVIEW",
+    paymentStatus, // 15. Payment status
+
+    // === 6. WORKFLOW TRACKING MANDATED PARAMETERS ===
+    completedStagesCount: workflowTracking.completedStagesCount,
+    completedStages: workflowTracking.completedStages,
+    dateEnteredIntoStage: workflowTracking.dateEnteredIntoStage,
+    daysPending: workflowTracking.daysPending,
+    stageSla: workflowTracking.sla,
+    stageSlaDays: workflowTracking.stageSlaDays,
+    slaStatus: workflowTracking.slaStatus,
+    pendingStage: workflowTracking.pendingStage,
+    pendingStageName: workflowTracking.pendingStage.name,
+    pendingStagesCount: workflowTracking.pendingStagesCount,
+    nextStage: workflowTracking.nextStage,
+    nextStageName: workflowTracking.nextStage?.name || "Disbursed",
+    canonicalPhase: workflowTracking.currentStage.phaseLabel,
+    canonicalPhaseId: workflowTracking.currentStage.phaseId,
+    journeyPhases: workflowTracking.journeyPhases,
+    workflowTracking,
+
+    // Contextual workflow metadata
+    workflowId: b.workflowId || null,
+    isPilot: Boolean(b.isPilot),
+    pilotName: b.pilotName || null,
+    towerId: b.towerId || null,
+    towerCode: tower?.code || "TWR-GEN",
+    towerName: tower?.name || "General Tower",
+    projectName: b.projectName || b.id,
+    projectType: b.projectType || "BBMP_LAKES",
+    daysInStage: workflowTracking.daysPending,
+    overdueDays: b.overdueDays || 0,
+    flagReason: b.flagReason || null,
+    contractor: b.contractor || "State Public Works Contractor",
+    ward: b.ward || b.unit || "General Municipality",
+    mbNumber: b.mbNumber || "",
+    description: b.description || "",
+    documentsCount: (b.documents || []).length,
+    historyCount: (b.history || []).length,
+    invoiceData: b.invoiceData || null,
+    paymentData: b.paymentData || null,
+    rejectionReason: b.rejectionReason || null,
+    rejectedBy: b.rejectedBy || null,
+    rejectedAt: b.rejectedAt || null,
+    closedAt: b.closedAt || null,
+    closedBy: b.closedBy || null
+  };
+}
+
+// Auth logout and profile endpoints
 app.post("/api/auth/logout", (req, res) => {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -912,7 +1534,7 @@ app.get("/api/auth/demo-users", (_req, res) => {
     role: u.role,
     department: u.department,
     badgeColor: u.badgeColor,
-    samplePassword: `${u.username}123`
+    samplePassword: (u.username === "billing_tower" || u.username === "admin") ? "#bill@2026" : `${u.username}123`
   }));
   res.json(demoList);
 });
@@ -941,7 +1563,7 @@ async function ensureBillDocumentsAnalyzed(bill) {
               size: stats.size,
               uploadedAt: stats.mtime.toISOString(),
               uploadedBy: "Administrative / Project Records",
-              url: `/uploads/${f}`,
+              url: `http://localhost:4000/uploads/${f}`,
               pdfAnalysis: analysis
             });
           } catch (fileErr) {
@@ -971,8 +1593,588 @@ async function ensureBillDocumentsAnalyzed(bill) {
   }
 }
 
-// Workflow and Bill endpoints
-app.get("/api/workflows", (_req, res) => res.json(workflows));
+// ========================================================
+// PHASE I: CONFIGURABLE DIGITAL WORKFLOW ENGINE & MASTERS
+// ========================================================
+
+// 1. ALL MASTERS OVERVIEW (Clients, Units, Services, Billing Types, Bills/Transactions, Roles, Persons, SLAs, Docs, Escalations)
+app.get("/api/masters/all", (_req, res) => {
+  try {
+    const data = workflowEngine.getAllMasters();
+    data.bills = Array.from(bills.values()).map(getBillMasterRecord);
+    if (!data.metrics) data.metrics = {};
+    data.metrics.totalBills = data.bills.length;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch master repository: " + err.message });
+  }
+});
+
+// 2. SPECIFIC MASTER LIST
+app.get("/api/masters/:type", (req, res) => {
+  try {
+    if (req.params.type === "bills" || req.params.type === "bill-master") {
+      return res.json(Array.from(bills.values()).map(getBillMasterRecord));
+    }
+    const list = workflowEngine.getMasterList(req.params.type);
+    res.json(list);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 3. CREATE MASTER ITEM
+app.post("/api/masters/:type", requireAuth, (req, res) => {
+  try {
+    if (req.params.type === "bills" || req.params.type === "bill-master") {
+      const bData = req.body;
+      const rawId = (bData.id || "").trim().toUpperCase();
+      if (!rawId) {
+        return res.status(400).json({ error: "Unique Bill ID is mandatory." });
+      }
+      const billId = rawId.startsWith("BILL-") ? rawId : `BILL-${rawId}`;
+      if (bills.has(billId)) {
+        return res.status(409).json({ error: `Every bill shall have a unique Bill ID. "${billId}" already exists.` });
+      }
+
+      const numAmount = parseCurrency(bData.amount) || bData.amountNum || 3500000;
+      const formattedAmount = `₹ ${numAmount.toLocaleString("en-IN")}`;
+      const now = new Date();
+
+      const newBill = {
+        id: billId,
+        billNumber: bData.billNumber?.trim() || `INV/2026/${Math.floor(100 + Math.random() * 900)}`,
+        client: bData.client?.trim() || "BBMP",
+        unit: bData.unit?.trim() || "Municipal Unit",
+        workOrder: bData.workOrder?.trim() || `WO/BBMP/2026/${Math.floor(1000 + Math.random() * 9000)}`,
+        contract: bData.contract?.trim() || `CNT-2025-${Math.floor(100 + Math.random() * 900)}`,
+        billingPeriod: bData.billingPeriod?.trim() || "Current RA Period",
+        billingType: bData.billingType?.trim() || "Monthly Running Account (RA) Bill",
+        amount: formattedAmount,
+        amountNum: numAmount,
+        submissionDate: bData.submissionDate ? new Date(bData.submissionDate).toISOString() : now.toISOString(),
+        expectedPaymentDate: bData.expectedPaymentDate ? new Date(bData.expectedPaymentDate).toISOString() : new Date(now.getTime() + 21 * 86400000).toISOString(),
+        currentStep: parseInt(bData.currentStep, 10) || 1,
+        currentRole: bData.currentRole?.trim() || "Field Officer",
+        currentPerson: bData.currentPerson?.trim() || "Assigned Officer",
+        workflowStatus: bData.workflowStatus?.trim() || bData.status?.trim() || "UNDER_REVIEW",
+        paymentStatus: bData.paymentStatus?.trim() || "UNPAID",
+        projectName: bData.projectName?.trim() || `${bData.unit || "Municipal"} Infrastructure Works`,
+        projectType: bData.projectType || "BBMP_LAKES",
+        workflowId: bData.workflowId || "WF-01-BBMP-LAKES",
+        towerId: bData.towerId || "TWR-101",
+        ward: bData.ward || bData.unit || "Municipal Division",
+        contractor: bData.contractor || "State Public Works Contractor",
+        mbNumber: bData.mbNumber || `MB-2026/${Math.floor(100 + Math.random() * 900)}`,
+        description: bData.description || `Bill Master registered: ${billId}`,
+        daysInStage: 0.5,
+        stageSlaDays: 2,
+        slaStatus: "WITHIN_SLA",
+        documents: [],
+        photos: getDefaultSitePhotosForTower("TWR-101", bData.projectName || billId, bData.unit || "Site"),
+        photoUrls: [],
+        history: [
+          {
+            step: 1,
+            startedAt: now.toISOString(),
+            dueAt: new Date(now.getTime() + 2 * 86400000).toISOString(),
+            savedAt: now.toISOString(),
+            action: `Bill Master dossier initiated (#${billId})`,
+            performedBy: `${req.user.name} (${req.user.role})`
+          }
+        ]
+      };
+
+      bills.set(billId, newBill);
+      return res.status(201).json({
+        message: `Bill Master record "${billId}" created successfully!`,
+        item: getBillMasterRecord(newBill)
+      });
+    }
+
+    const created = workflowEngine.createMasterItem(req.params.type, req.body);
+    res.status(201).json({
+      message: `Master item registered successfully in "${req.params.type}"!`,
+      item: created
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 4. UPDATE MASTER ITEM
+app.put("/api/masters/:type/:id", requireAuth, (req, res) => {
+  try {
+    if (req.params.type === "bills" || req.params.type === "bill-master") {
+      const bill = bills.get(req.params.id);
+      if (!bill) return res.status(404).json({ error: `Bill "${req.params.id}" not found.` });
+
+      const updates = req.body;
+      if (updates.billNumber) bill.billNumber = updates.billNumber.trim();
+      if (updates.client) bill.client = updates.client.trim();
+      if (updates.unit) bill.unit = updates.unit.trim();
+      if (updates.workOrder) bill.workOrder = updates.workOrder.trim();
+      if (updates.contract) bill.contract = updates.contract.trim();
+      if (updates.billingPeriod) bill.billingPeriod = updates.billingPeriod.trim();
+      if (updates.billingType) bill.billingType = updates.billingType.trim();
+      if (updates.amount) {
+        bill.amountNum = parseCurrency(updates.amount) || bill.amountNum;
+        bill.amount = `₹ ${bill.amountNum.toLocaleString("en-IN")}`;
+      }
+      if (updates.submissionDate) bill.submissionDate = new Date(updates.submissionDate).toISOString();
+      if (updates.expectedPaymentDate) bill.expectedPaymentDate = new Date(updates.expectedPaymentDate).toISOString();
+      if (updates.currentRole) bill.currentRole = updates.currentRole.trim();
+      if (updates.currentPerson) bill.currentPerson = updates.currentPerson.trim();
+      if (updates.workflowStatus || updates.status) bill.workflowStatus = (updates.workflowStatus || updates.status).trim();
+      if (updates.paymentStatus) bill.paymentStatus = updates.paymentStatus.trim();
+      if (updates.currentStep) bill.currentStep = parseInt(updates.currentStep, 10);
+      if (updates.projectName) bill.projectName = updates.projectName.trim();
+      if (updates.description) bill.description = updates.description.trim();
+
+      return res.json({
+        message: `Bill Master "${req.params.id}" updated successfully!`,
+        item: getBillMasterRecord(bill)
+      });
+    }
+
+    const updated = workflowEngine.updateMasterItem(req.params.type, req.params.id, req.body);
+    res.json({
+      message: `Master item "${req.params.id}" updated successfully!`,
+      item: updated
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 5. DELETE MASTER ITEM
+app.delete("/api/masters/:type/:id", requireAuth, (req, res) => {
+  try {
+    if (req.params.type === "bills" || req.params.type === "bill-master") {
+      const bill = bills.get(req.params.id);
+      if (!bill) return res.status(404).json({ error: `Bill "${req.params.id}" not found.` });
+      if (bills.size <= 1) {
+        return res.status(400).json({ error: "Cannot delete the only active bill in the system." });
+      }
+      bills.delete(req.params.id);
+      return res.json({
+        message: `Bill "${req.params.id}" removed from Master repository.`,
+        item: getBillMasterRecord(bill)
+      });
+    }
+
+    const deleted = workflowEngine.deleteMasterItem(req.params.type, req.params.id);
+    res.json({
+      message: `Master item "${req.params.id}" removed successfully.`,
+      item: deleted
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 6. WORKFLOW CATALOG (DYNAMIC FROM ENGINE)
+app.get("/api/workflows", (req, res) => {
+  const list = workflowEngine.getWorkflows(req.query);
+  res.json({
+    legacy: workflows,
+    catalog: list,
+    categories: WORKFLOW_CATEGORIES,
+    total: workflowEngine.workflows.length
+  });
+});
+
+app.get("/api/workflows/catalog", (req, res) => {
+  const list = workflowEngine.getWorkflows(req.query);
+  res.json(list);
+});
+
+app.get("/api/workflows/categories", (_req, res) => {
+  res.json(WORKFLOW_CATEGORIES);
+});
+
+app.get("/api/workflows/:id", (req, res) => {
+  const wf = workflowEngine.getWorkflowById(req.params.id);
+  if (!wf) return res.status(404).json({ error: `Workflow "${req.params.id}" not found.` });
+  res.json(wf);
+});
+
+// 7. CREATE WORKFLOW (Authorized Admin / Officer)
+app.post("/api/workflows", requireAuth, (req, res) => {
+  try {
+    const created = workflowEngine.createWorkflow(req.body);
+    res.status(201).json({
+      message: `Workflow "${created.id}" created successfully in digital workflow engine!`,
+      workflow: created
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 8. UPDATE WORKFLOW (Authorized Admin / Officer)
+app.put("/api/workflows/:id", requireAuth, (req, res) => {
+  try {
+    const updated = workflowEngine.updateWorkflow(req.params.id, req.body);
+
+    // Also update any active bills mapped to this workflow
+    Array.from(bills.values()).forEach((b) => {
+      if (b.workflowId === req.params.id) {
+        b.stages = updated.stages.map((s) => s.name);
+        b.totalSteps = updated.stages.length;
+        if (b.currentStep > updated.stages.length) {
+          b.currentStep = updated.stages.length;
+        }
+        const activeStage = updated.stages[b.currentStep - 1];
+        if (activeStage) {
+          b.currentRole = activeStage.role;
+          b.stageSlaDays = activeStage.slaDays;
+        }
+      }
+    });
+
+    res.json({
+      message: `Workflow "${updated.id}" updated successfully in digital workflow engine!`,
+      workflow: updated
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 9. DELETE WORKFLOW
+app.delete("/api/workflows/:id", requireAuth, (req, res) => {
+  try {
+    const deleted = workflowEngine.deleteWorkflow(req.params.id);
+    res.json({
+      message: `Workflow "${req.params.id}" archived successfully.`,
+      workflow: deleted
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 10. CLONE / DUPLICATE WORKFLOW
+app.post("/api/workflows/:id/duplicate", requireAuth, (req, res) => {
+  try {
+    const cloned = workflowEngine.duplicateWorkflow(req.params.id);
+    res.status(201).json({
+      message: `Workflow cloned successfully as "${cloned.id}"!`,
+      workflow: cloned
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 11. RESET WORKFLOWS TO 34 BASELINE OFFICIAL PROCESSES
+app.post("/api/workflows/reset-baseline", requireAuth, (_req, res) => {
+  try {
+    const reset = workflowEngine.resetWorkflowsToBaseline();
+    res.json({
+      message: "All 34 workflows reset to the official billing-process baseline document.",
+      total: reset.length
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========================================================
+// CONTROL TOWER EXECUTIVE DASHBOARD METRICS
+// (Implements Requirements in Section 3 & 8 of Executive Directive)
+// ========================================================
+app.get("/api/control-tower/summary", requireAuth, (_req, res) => {
+  const allBills = Array.from(bills.values());
+  const totalBills = allBills.length;
+  const totalBillingValueNum = allBills.reduce(
+    (acc, b) => acc + (b.amountNum || parseCurrency(b.amount)),
+    0
+  );
+  const billsPaid = allBills.filter(
+    (b) => b.workflowStatus === "PAID" || b.workflowStatus === "CLOSED"
+  ).length;
+  const billsInProcess = allBills.filter(
+    (b) =>
+      b.workflowStatus === "UNDER_REVIEW" ||
+      b.workflowStatus === "SUBMITTED" ||
+      b.workflowStatus === "INVOICE" ||
+      b.workflowStatus === "PAYMENT"
+  ).length;
+  const billsReturned = allBills.filter(
+    (b) => b.workflowStatus === "REJECTED_EDIT"
+  ).length;
+  const billsPending = billsInProcess + billsReturned;
+  const billsOverdue = allBills.filter(
+    (b) => b.slaStatus === "BREACHED_SLA"
+  ).length;
+  const billsApproachingSla = allBills.filter(
+    (b) => b.slaStatus === "APPROACHING_SLA"
+  ).length;
+  const billsRequiringIntervention = allBills.filter(
+    (b) =>
+      b.slaStatus === "BREACHED_SLA" ||
+      b.workflowStatus === "REJECTED_EDIT" ||
+      b.slaStatus === "APPROACHING_SLA"
+  ).length;
+
+  // 1. Client-wise Performance Matrix
+  const clientMap = {};
+  for (const b of allBills) {
+    const client = b.client || "Other";
+    if (!clientMap[client]) {
+      clientMap[client] = {
+        client,
+        billCount: 0,
+        totalValue: 0,
+        inProcessCount: 0,
+        paidCount: 0,
+        breachedCount: 0,
+        avgDays: 0,
+        totalDays: 0
+      };
+    }
+    clientMap[client].billCount++;
+    clientMap[client].totalValue += (b.amountNum || parseCurrency(b.amount));
+    clientMap[client].totalDays += (b.daysInStage || 1);
+    if (b.slaStatus === "BREACHED_SLA") clientMap[client].breachedCount++;
+    if (b.workflowStatus === "PAID" || b.workflowStatus === "CLOSED") {
+      clientMap[client].paidCount++;
+    } else {
+      clientMap[client].inProcessCount++;
+    }
+  }
+
+  const clientPerformance = Object.values(clientMap).map((c) => ({
+    ...c,
+    formattedValue: `₹ ${c.totalValue.toLocaleString("en-IN")}`,
+    avgDays: Math.round((c.totalDays / c.billCount) * 10) / 10,
+    slaHealth: c.breachedCount === 0 ? "GREEN" : (c.breachedCount === 1 ? "AMBER" : "RED")
+  }));
+
+  // 2. Stage Bottlenecks
+  const stageMap = {};
+  for (const b of allBills) {
+    if (b.workflowStatus === "UNDER_REVIEW" || b.workflowStatus === "REJECTED_EDIT") {
+      const stageName = b.currentRole || `Step ${b.currentStep}`;
+      if (!stageMap[stageName]) {
+        stageMap[stageName] = {
+          stage: stageName,
+          count: 0,
+          totalDwellDays: 0,
+          breachedCount: 0,
+          client: b.client
+        };
+      }
+      stageMap[stageName].count++;
+      stageMap[stageName].totalDwellDays += (b.daysInStage || 1);
+      if (b.slaStatus === "BREACHED_SLA") stageMap[stageName].breachedCount++;
+    }
+  }
+
+  const stageBottlenecks = Object.values(stageMap).sort((a, b) => b.totalDwellDays - a.totalDwellDays);
+
+  // 3. Ageing-wise Distribution
+  const aging = {
+    under7Days: allBills.filter((b) => (b.daysInStage || 1) <= 7).length,
+    days8To15: allBills.filter((b) => (b.daysInStage || 1) > 7 && (b.daysInStage || 1) <= 15).length,
+    days16To30: allBills.filter((b) => (b.daysInStage || 1) > 15 && (b.daysInStage || 1) <= 30).length,
+    over30Days: allBills.filter((b) => (b.daysInStage || 1) > 30).length
+  };
+
+  // 4. Action Required: Bills Requiring Management / Intervention Today
+  const interventionQueue = allBills
+    .filter(
+      (b) =>
+        b.slaStatus === "BREACHED_SLA" ||
+        b.workflowStatus === "REJECTED_EDIT" ||
+        b.slaStatus === "APPROACHING_SLA"
+    )
+    .map((b) => ({
+      id: b.id,
+      billNumber: b.billNumber || b.id,
+      client: b.client || "Municipal",
+      unit: b.unit || b.projectName,
+      projectName: b.projectName,
+      amount: b.amount,
+      amountNum: b.amountNum || parseCurrency(b.amount),
+      currentStep: b.currentStep,
+      currentRole: b.currentRole || "Assigned Officer",
+      currentPerson: b.currentPerson || "Section In-Charge",
+      slaStatus: b.slaStatus,
+      daysInStage: b.daysInStage || 1,
+      stageSlaDays: b.stageSlaDays || 2,
+      overdueDays: b.overdueDays || 0,
+      flagReason: b.flagReason || b.rejectionReason || null,
+      urgency:
+        b.slaStatus === "BREACHED_SLA"
+          ? "CRITICAL"
+          : b.workflowStatus === "REJECTED_EDIT"
+          ? "HIGH"
+          : "MEDIUM",
+      actionRequired:
+        b.slaStatus === "BREACHED_SLA"
+          ? `Overdue by ${b.overdueDays || 2} days. Immediate escalation to ${b.currentRole} HOD.`
+          : b.workflowStatus === "REJECTED_EDIT"
+          ? "Vendor resubmission needed on audit objections."
+          : "Approaching SLA deadline in <24 hours. Send automated dispatch reminder."
+    }));
+
+  res.json({
+    metrics: {
+      totalBills,
+      totalBillingValue: `₹ ${totalBillingValueNum.toLocaleString("en-IN")}`,
+      totalBillingValueNum,
+      billsInProcess,
+      billsPaid,
+      billsPending,
+      billsOverdue,
+      billsApproachingSla,
+      billsReturned,
+      billsRequiringIntervention
+    },
+    clientPerformance,
+    stageBottlenecks,
+    aging,
+    interventionQueue,
+    pilotUnits: [
+      {
+        id: "PILOT-1",
+        name: "BBMP Lakes North Zone",
+        client: "BBMP",
+        sector: "Civic & Municipal Infrastructure",
+        stagesCount: 15,
+        activeBillId: "BILL-1001",
+        status: "HEALTHY",
+        slaCompliance: "100%",
+        note: "Testing 15-tier civil engineering check-measurements and DC Bill/DCF Fund double-route."
+      },
+      {
+        id: "PILOT-2",
+        name: "BMRCL Project Wing (80/20)",
+        client: "BMRCL",
+        sector: "Mass Rapid Transit Infrastructure",
+        stagesCount: 8,
+        activeBillId: "BILL-1002 / BILL-1003",
+        status: "ATTENTION_REQUIRED",
+        slaCompliance: "50%",
+        note: "Testing split milestone: 80% operational milestone via CSO/GM Ops, and 20% statutory HR retention."
+      }
+    ]
+  });
+});
+
+// Mock HRMS Integration Store
+const hrmsMockContracts = [
+  {
+    contractId: "HRMS-CON-2026-BBMP-01",
+    workOrderNumber: "WO/BBMP/LAKES/2026/042",
+    client: "BBMP",
+    unit: "BBMP Lakes North Zone",
+    service: "Desilting & Inflow Silt Weir Maintenance",
+    sanctionedAmount: 5000000,
+    validFrom: "2026-04-01",
+    validTo: "2027-03-31",
+    contractor: "Sri Sai Infratech Projects",
+    status: "ACTIVE"
+  },
+  {
+    contractId: "HRMS-CON-2026-BMRCL-02",
+    workOrderNumber: "BMRCL/R3C/VIADUCT/2025/11",
+    client: "BMRCL",
+    unit: "BMRCL Project Wing",
+    service: "Elevated Viaduct Pier Structural Works",
+    sanctionedAmount: 15000000,
+    validFrom: "2025-10-01",
+    validTo: "2027-06-30",
+    contractor: "Karnataka Infrastructure & Metro Constr Ltd",
+    status: "ACTIVE"
+  },
+  {
+    contractId: "HRMS-CON-2026-KIADB-03",
+    workOrderNumber: "KIADB/HARO/CIVIL/2026/08",
+    client: "KIADB",
+    unit: "KIADB Harohalli Industrial Area",
+    service: "Effluent Pipeline Transmission Network",
+    sanctionedAmount: 7500000,
+    validFrom: "2026-01-15",
+    validTo: "2026-12-31",
+    contractor: "Apex Urban Engineering Corp",
+    status: "ACTIVE"
+  }
+];
+
+const hrmsSyncLogs = [];
+
+app.get("/api/hrms/contracts", requireAuth, (_req, res) => res.json(hrmsMockContracts));
+app.get("/api/hrms/sync-logs", requireAuth, (_req, res) => res.json(hrmsSyncLogs));
+
+app.post("/api/hrms/sync-contract", requireAuth, (req, res) => {
+  const { workOrderNumber, client, unit, service, sanctionedAmount, contractor } = req.body;
+  if (!workOrderNumber || !client) {
+    return res.status(400).json({ error: "Work Order Number and Client are required." });
+  }
+
+  const newContract = {
+    contractId: `HRMS-CON-${Date.now()}`,
+    workOrderNumber: workOrderNumber.trim(),
+    client: client.trim(),
+    unit: unit?.trim() || "Headquarters Unit",
+    service: service?.trim() || "General Engineering & Facility Services",
+    sanctionedAmount: parseCurrency(sanctionedAmount) || 5000000,
+    validFrom: new Date().toISOString().split("T")[0],
+    validTo: new Date(Date.now() + 365 * 86400000).toISOString().split("T")[0],
+    contractor: contractor?.trim() || "Authorized Contractor",
+    status: "ACTIVE"
+  };
+
+  hrmsMockContracts.unshift(newContract);
+  hrmsSyncLogs.unshift({
+    timestamp: new Date().toISOString(),
+    event: "INBOUND_WORK_ORDER_SYNC",
+    source: "HRMS Enterprise Core",
+    workOrder: newContract.workOrderNumber,
+    client: newContract.client,
+    performedBy: `${req.user.name} (${req.user.role})`
+  });
+
+  res.status(201).json({
+    message: `Contract "${newContract.workOrderNumber}" successfully synchronized from HRMS!`,
+    contract: newContract
+  });
+});
+
+app.post("/api/hrms/test-webhook", requireAuth, (req, res) => {
+  const { billId } = req.body;
+  const bill = bills.get(billId) || Array.from(bills.values())[0];
+  const payload = {
+    webhookEvent: "BILL_STAGE_TRANSITION",
+    billId: bill.id,
+    billNumber: bill.billNumber || bill.id,
+    client: bill.client,
+    unit: bill.unit,
+    currentStep: bill.currentStep,
+    currentRole: bill.currentRole,
+    workflowStatus: bill.workflowStatus,
+    amount: bill.amount,
+    timestamp: new Date().toISOString()
+  };
+
+  hrmsSyncLogs.unshift({
+    timestamp: new Date().toISOString(),
+    event: "OUTBOUND_STAGE_WEBHOOK",
+    target: "HRMS Integration Bus (https://hrms.corp/api/v1/billing-events)",
+    billNumber: payload.billNumber,
+    status: "DISPATCHED_HTTP_200",
+    payload
+  });
+
+  res.json({
+    message: `Webhook successfully dispatched to HRMS bus for ${payload.billNumber}`,
+    payload
+  });
+});
 
 // ========================================================
 // TOWER MASTER ENDPOINTS
@@ -1035,37 +2237,9 @@ app.post("/api/towers", requireAuth, (req, res) => {
 // BILLS & WORKFLOW ENDPOINTS
 // ========================================================
 
-// List all bills summary with full workflow metadata
+// List all bills summary with full workflow metadata & Section 5 attributes
 app.get("/api/bills", requireAuth, (_req, res) => {
-  const list = Array.from(bills.values()).map((b) => {
-    const tower = towers.get(b.towerId);
-    return {
-      id: b.id,
-      towerId: b.towerId || null,
-      towerCode: tower?.code || "TWR-GEN",
-      towerName: tower?.name || "General Tower",
-      projectName: b.projectName,
-      projectType: b.projectType,
-      workflowStatus: b.workflowStatus || "UNDER_REVIEW",
-      rejectionReason: b.rejectionReason || null,
-      rejectedBy: b.rejectedBy || null,
-      rejectedAt: b.rejectedAt || null,
-      invoiceData: b.invoiceData || null,
-      paymentData: b.paymentData || null,
-      closedAt: b.closedAt || null,
-      closedBy: b.closedBy || null,
-      currentStep: b.currentStep,
-      totalSteps: stagesFor(b).length,
-      amount: b.amount || "₹ 45,50,000",
-      amountNum: b.amountNum || parseCurrency(b.amount),
-      contractor: b.contractor || "BBMP Certified Vendor",
-      ward: b.ward || "General Municipality",
-      mbNumber: b.mbNumber || "",
-      description: b.description || "",
-      documentsCount: (b.documents || []).length,
-      historyCount: (b.history || []).length
-    };
-  });
+  const list = Array.from(bills.values()).map(getBillMasterRecord);
   res.json(list);
 });
 
@@ -1074,6 +2248,9 @@ app.post("/api/bills", requireAuth, (req, res) => {
   const {
     id,
     towerId,
+    workflowId,
+    client,
+    unit,
     projectName,
     projectType = "BBMP_LAKES",
     amount = "₹ 35,00,000",
@@ -1104,8 +2281,9 @@ app.post("/api/bills", requireAuth, (req, res) => {
     return res.status(409).json({ error: `Bill ID "${billId}" already exists.` });
   }
 
-  const validProjectType = workflows[projectType] ? projectType : "BBMP_LAKES";
-  const stages = workflows[validProjectType];
+  const matchedWf = workflowId ? workflowEngine.getWorkflowById(workflowId) : null;
+  const validProjectType = matchedWf ? matchedWf.id : (workflows[projectType] ? projectType : "BBMP_LAKES");
+  const stages = matchedWf ? matchedWf.stages.map((s) => s.name) : (workflows[validProjectType] || workflows.BBMP_LAKES);
   const numAmount = parseCurrency(amount) || 3500000;
   const formattedAmount = `₹ ${numAmount.toLocaleString("en-IN")}`;
 
@@ -1134,20 +2312,38 @@ app.post("/api/bills", requireAuth, (req, res) => {
   // Workflow status: if submitImmediately then "UNDER_REVIEW", else "DRAFT" or "SUBMITTED"
   const initialWorkflowStatus = submitImmediately ? "UNDER_REVIEW" : "SUBMITTED";
   const initialStep = submitImmediately ? 2 : 1;
+  const activeStage = matchedWf && matchedWf.stages ? matchedWf.stages[initialStep - 1] : null;
 
   const newBill = {
     id: billId,
+    billNumber: req.body.billNumber?.trim() || `INV/2026/${Math.floor(100 + Math.random() * 900)}`,
+    client: client?.trim() || matchedWf?.client || "BBMP",
+    unit: unit?.trim() || matchedWf?.unit || matchedTower?.ward || "Municipal Division",
+    workOrder: req.body.workOrder?.trim() || req.body.workOrderNo?.trim() || `WO/${(client || "BBMP").toUpperCase()}/2026/${Math.floor(1000 + Math.random() * 9000)}`,
+    contract: req.body.contract?.trim() || req.body.contractNo?.trim() || `CNT-2025-${(client || "GEN").toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`,
+    billingPeriod: req.body.billingPeriod?.trim() || "Current RA Period",
+    billingType: req.body.billingType?.trim() || (matchedWf ? `${matchedWf.category} Billing` : "Monthly Running Account (RA) Bill"),
     towerId: resolvedTowerId,
+    workflowId: matchedWf ? matchedWf.id : null,
     projectName: projectName.trim(),
     projectType: validProjectType,
     workflowStatus: initialWorkflowStatus,
+    paymentStatus: req.body.paymentStatus?.trim() || "UNPAID",
     currentStep: initialStep,
+    totalSteps: stages.length,
+    currentRole: activeStage?.role || (stages[initialStep - 1] || "Officer"),
+    currentPerson: activeStage?.personName || "Assigned Officer",
+    stageSlaDays: activeStage?.slaDays || 2,
+    daysInStage: 0.5,
+    slaStatus: "WITHIN_SLA",
+    submissionDate: req.body.submissionDate ? new Date(req.body.submissionDate).toISOString() : now.toISOString(),
+    expectedPaymentDate: req.body.expectedPaymentDate ? new Date(req.body.expectedPaymentDate).toISOString() : new Date(now.getTime() + (matchedWf?.totalSlaDays || 18) * 86400000).toISOString(),
     amount: formattedAmount,
     amountNum: numAmount,
     contractor: contractor.trim() || matchedTower?.contractor || "State Public Works Contractor",
     ward: ward.trim() || matchedTower?.ward || "Municipal Division",
     mbNumber: mbNumber.trim() || `MB-2026/${Math.floor(100 + Math.random() * 900)}`,
-    description: description.trim() || `Billing initiated for Tower ${matchedTower?.code || resolvedTowerId}`,
+    description: description.trim() || `Billing initiated for ${matchedWf ? matchedWf.serviceType : `Tower ${matchedTower?.code || resolvedTowerId}`}`,
     photos: resolvedPhotos,
     photoUrls: resolvedPhotos.map((p) => p.url),
     documents: [],
@@ -1157,7 +2353,7 @@ app.post("/api/bills", requireAuth, (req, res) => {
         startedAt: now.toISOString(),
         dueAt: due.toISOString(),
         savedAt: now.toISOString(),
-        action: `Billing docket initiated under Tower ${matchedTower?.name || resolvedTowerId}`,
+        action: `Billing docket initiated under Workflow ${matchedWf?.id || resolvedTowerId} (${matchedWf?.serviceType || "Standard Civil"})`,
         performedBy: `${req.user.name} (${req.user.role})`
       }
     ]
@@ -1277,13 +2473,44 @@ app.put("/api/bills/:id/edit", requireAuth, (req, res) => {
   const bill = bills.get(req.params.id);
   if (!bill) return res.status(404).json({ error: "Bill not found" });
 
-  const { projectName, amount, contractor, ward, mbNumber, description } = req.body;
+  const {
+    projectName,
+    amount,
+    contractor,
+    ward,
+    mbNumber,
+    description,
+    billNumber,
+    client,
+    unit,
+    workOrder,
+    contract,
+    billingPeriod,
+    billingType,
+    paymentStatus,
+    submissionDate,
+    expectedPaymentDate,
+    currentRole,
+    currentPerson
+  } = req.body;
 
   if (projectName && projectName.trim()) bill.projectName = projectName.trim();
   if (contractor && contractor.trim()) bill.contractor = contractor.trim();
   if (ward && ward.trim()) bill.ward = ward.trim();
   if (mbNumber && mbNumber.trim()) bill.mbNumber = mbNumber.trim();
   if (description && description.trim()) bill.description = description.trim();
+  if (billNumber && billNumber.trim()) bill.billNumber = billNumber.trim();
+  if (client && client.trim()) bill.client = client.trim();
+  if (unit && unit.trim()) bill.unit = unit.trim();
+  if (workOrder && workOrder.trim()) bill.workOrder = workOrder.trim();
+  if (contract && contract.trim()) bill.contract = contract.trim();
+  if (billingPeriod && billingPeriod.trim()) bill.billingPeriod = billingPeriod.trim();
+  if (billingType && billingType.trim()) bill.billingType = billingType.trim();
+  if (paymentStatus && paymentStatus.trim()) bill.paymentStatus = paymentStatus.trim();
+  if (submissionDate) bill.submissionDate = new Date(submissionDate).toISOString();
+  if (expectedPaymentDate) bill.expectedPaymentDate = new Date(expectedPaymentDate).toISOString();
+  if (currentRole && currentRole.trim()) bill.currentRole = currentRole.trim();
+  if (currentPerson && currentPerson.trim()) bill.currentPerson = currentPerson.trim();
 
   if (amount) {
     const num = parseCurrency(amount);
@@ -1371,6 +2598,7 @@ app.post("/api/bills/:id/record-payment", requireAuth, (req, res) => {
 
   const now = new Date();
   bill.workflowStatus = "PAID";
+  bill.paymentStatus = "PAID";
   bill.currentStep = Math.max(bill.currentStep, 12);
 
   const netPayable = bill.invoiceData?.netPayable || bill.amountNum || parseCurrency(bill.amount);
@@ -1446,6 +2674,16 @@ app.get("/api/reports", requireAuth, (_req, res) => {
       formattedNet: `₹ ${net.toLocaleString("en-IN")}`,
       invoiceNo: b.invoiceData?.invoiceNo || "-",
       utrNumber: b.paymentData?.utrNumber || "-",
+      client: b.client || "BBMP",
+      unit: b.unit || b.ward || "Municipal Unit",
+      amount: b.amount || `₹ ${gross.toLocaleString("en-IN")}`,
+      amountNum: gross,
+      slaStatus: b.slaStatus || "WITHIN_SLA",
+      daysInStage: b.daysInStage || 1,
+      stageSlaDays: b.stageSlaDays || 2,
+      currentRole: b.currentRole || "Assigned Officer",
+      paymentDate: b.paymentData?.paymentDate || b.paymentDate || null,
+      expectedPaymentDate: b.expectedPaymentDate || null,
       rejectionReason: b.rejectionReason || null,
       rejectedBy: b.rejectedBy || null,
       historyCount: (b.history || []).length,
@@ -1524,7 +2762,48 @@ app.get("/api/bills/:id", requireAuth, async (req, res) => {
   }
 
   await ensureBillDocumentsAnalyzed(bill);
-  res.json({ ...bill, stages: stagesFor(bill) });
+  const stages = stagesFor(bill);
+  const workflow = getWorkflowForBill(bill);
+  const workflowTracking = getWorkflowTrackingData(bill);
+  res.json({
+    ...bill,
+    stages,
+    workflowDetails: workflow,
+    totalSteps: stages.length,
+    currentStageName: stages[bill.currentStep - 1] || `Step ${bill.currentStep}`,
+    workflowTracking,
+    dateEnteredIntoStage: workflowTracking.dateEnteredIntoStage,
+    daysPending: workflowTracking.daysPending,
+    daysInStage: workflowTracking.daysPending,
+    stageSlaDays: workflowTracking.stageSlaDays,
+    slaStatus: workflowTracking.slaStatus,
+    completedStagesCount: workflowTracking.completedStagesCount,
+    pendingStageName: workflowTracking.pendingStage.name,
+    nextStageName: workflowTracking.nextStage?.name || "Disbursed",
+    canonicalPhase: workflowTracking.currentStage.phaseLabel,
+    canonicalPhaseId: workflowTracking.currentStage.phaseId,
+    journeyPhases: workflowTracking.journeyPhases
+  });
+});
+
+// Explicit 6. Workflow Tracking Endpoint
+app.get("/api/bills/:id/workflow-tracking", requireAuth, (req, res) => {
+  const bill = bills.get(req.params.id);
+  if (!bill) return res.status(404).json({ error: "Bill not found" });
+  const tracking = getWorkflowTrackingData(bill);
+  res.json(tracking);
+});
+
+app.get("/api/proposal/deliverables", (_req, res) => {
+  res.json({
+    reference: "BCT-IT-PHASE1-PROPOSAL-2026-v1.0",
+    sponsor: "CEO",
+    productOwner: "Col. Jyothi",
+    technicalLead: "Raghavendra",
+    deliverablesCount: 11,
+    status: "UNDER_REVIEW",
+    summary: "Complete Phase-I Technical Architecture and 34-Workflow Master proposal for independent Billing Control Tower development."
+  });
 });
 
 // ATTACH / UPLOAD NEW SITE INSPECTION PHOTO SPECIFIC TO THIS SITE
@@ -1647,6 +2926,10 @@ app.post("/api/bills/:id/transition", requireAuth, (req, res) => {
   const now = new Date();
   const due = new Date(now.getTime() + 2 * 86400000);
   bill.currentStep = requested;
+  bill.dateEnteredIntoStage = now.toISOString();
+  bill.daysInStage = 0;
+  bill.daysPending = 0;
+  bill.slaStatus = "WITHIN_SLA";
   bill.history.push({
     step: requested,
     startedAt: now.toISOString(),
@@ -1656,9 +2939,17 @@ app.post("/api/bills/:id/transition", requireAuth, (req, res) => {
     performedBy: `${req.user.name} (${req.user.role})`
   });
 
+  const workflowTracking = getWorkflowTrackingData(bill);
+
   res.json({
     ...bill,
     stages,
+    workflowTracking,
+    dateEnteredIntoStage: bill.dateEnteredIntoStage,
+    daysPending: 0,
+    daysInStage: 0,
+    stageSlaDays: workflowTracking.stageSlaDays,
+    slaStatus: "WITHIN_SLA",
     transitionId: crypto.randomUUID(),
     message: `Moved to Step ${requested}: ${stages[requested - 1]} by ${req.user.name}`
   });
@@ -1844,7 +3135,7 @@ app.post("/api/bills/:id/documents", requireAuth, async (req, res) => {
     size: fileSize || fileBuffer.length,
     uploadedAt: new Date().toISOString(),
     uploadedBy: `${req.user.name} (${req.user.role})`,
-    url: `/uploads/${storageFileName}`,
+    url: `http://localhost:4000/uploads/${storageFileName}`,
     pdfAnalysis
   };
 
@@ -1937,6 +3228,186 @@ app.delete("/api/bills/:id/documents/:docId", requireAuth, (req, res) => {
   res.json({
     message: `${removedDoc.name} deleted successfully.`,
     documents: bill.documents
+  });
+});
+
+// ============================================================
+// BILLING CONTROL TOWER & WORKFLOW ENGINE ENDPOINTS
+// ============================================================
+
+// 1. Management Visibility Dashboard Summary (Section 8)
+app.get("/api/control-tower/summary", (req, res) => {
+  const allBills = Array.from(bills.values());
+  const totalBills = allBills.length;
+  let totalBillingValue = 0;
+  let inProcessCount = 0;
+  let paidCount = 0;
+  let breachedCount = 0;
+  let approachingCount = 0;
+  let returnedCount = 0;
+
+  const urgentInterventionQueue = [];
+  const clientBreakdown = {};
+  const stageBottlenecks = {};
+
+  allBills.forEach((b) => {
+    const val = typeof b.amountNum === "number" ? b.amountNum : parseCurrency(b.amount);
+    totalBillingValue += val;
+
+    if (b.workflowStatus === "PAID" || b.currentStep >= 12) {
+      paidCount++;
+    } else {
+      inProcessCount++;
+    }
+
+    if (b.slaStatus === "BREACHED_SLA") {
+      breachedCount++;
+      urgentInterventionQueue.push({
+        id: b.id,
+        billNumber: b.billNumber,
+        client: b.client,
+        unit: b.unit,
+        amount: b.amount,
+        currentRole: b.currentRole,
+        currentPerson: b.currentPerson,
+        daysInStage: b.daysInStage,
+        stageSlaDays: b.stageSlaDays,
+        slaBreachDays: Math.max(0, b.daysInStage - b.stageSlaDays),
+        urgency: "CRITICAL",
+        reason: `Exceeded stage SLA by ${Math.max(0, b.daysInStage - b.stageSlaDays)} days at ${b.currentRole}`,
+        actionRequired: "Executive escalation to concerned Directorate"
+      });
+    } else if (b.slaStatus === "APPROACHING_SLA") {
+      approachingCount++;
+      urgentInterventionQueue.push({
+        id: b.id,
+        billNumber: b.billNumber,
+        client: b.client,
+        unit: b.unit,
+        amount: b.amount,
+        currentRole: b.currentRole,
+        currentPerson: b.currentPerson,
+        daysInStage: b.daysInStage,
+        stageSlaDays: b.stageSlaDays,
+        urgency: "HIGH",
+        reason: `Due within 24 hours at ${b.currentRole}`,
+        actionRequired: "Automated alert issued to desk officer"
+      });
+    }
+
+    if (b.workflowStatus === "RETURNED" || b.status === "RETURNED") {
+      returnedCount++;
+      urgentInterventionQueue.push({
+        id: b.id,
+        billNumber: b.billNumber,
+        client: b.client,
+        unit: b.unit,
+        amount: b.amount,
+        currentRole: b.currentRole,
+        currentPerson: b.currentPerson,
+        urgency: "HIGH",
+        reason: "Returned for MB measurement discrepancy",
+        actionRequired: "Resubmission pending from Unit Field Officer"
+      });
+    }
+
+    // Client Breakdown
+    clientBreakdown[b.client] = (clientBreakdown[b.client] || 0) + val;
+
+    // Bottlenecks
+    const roleKey = b.currentRole || "Pending Review";
+    stageBottlenecks[roleKey] = (stageBottlenecks[roleKey] || 0) + 1;
+  });
+
+  // Aging distribution
+  const aging = {
+    under15: allBills.filter(b => (b.daysInStage || 1) <= 15).length,
+    between16and30: allBills.filter(b => (b.daysInStage || 1) > 15 && (b.daysInStage || 1) <= 30).length,
+    between31and45: allBills.filter(b => (b.daysInStage || 1) > 30 && (b.daysInStage || 1) <= 45).length,
+    over45: allBills.filter(b => (b.daysInStage || 1) > 45).length
+  };
+
+  // Pilot units specific metrics
+  const pilot1Bills = allBills.filter(b => b.unit?.toLowerCase().includes("bbmp"));
+  const pilot2Bills = allBills.filter(b => b.unit?.toLowerCase().includes("bmrcl"));
+
+  res.json({
+    kpis: {
+      totalBills,
+      totalBillingValue,
+      totalBillingValueFormatted: `₹ ${(totalBillingValue / 100000).toFixed(2)} Lakhs`,
+      billsInProcess: inProcessCount,
+      billsPaid: paidCount,
+      billsPending: inProcessCount,
+      billsOverdue: breachedCount,
+      billsApproachingSla: approachingCount,
+      billsReturned: returnedCount,
+      billsRequiringIntervention: urgentInterventionQueue.length
+    },
+    urgentInterventionQueue,
+    clientBreakdown,
+    stageBottlenecks,
+    aging,
+    pilots: {
+      pilot1: {
+        id: "PILOT-01",
+        name: "BBMP Lakes North Zone",
+        type: "Municipal Civil Works & Double Bill (15 Stages)",
+        totalBills: pilot1Bills.length,
+        inProcess: pilot1Bills.filter(b => b.workflowStatus !== "PAID").length,
+        slaCompliance: "92.4%",
+        activeStage: "Vigilance & Labour Cell"
+      },
+      pilot2: {
+        id: "PILOT-02",
+        name: "BMRCL Project Wing (Phase 2)",
+        type: "Transit Infrastructure Split Milestone (80/20 Route)",
+        totalBills: pilot2Bills.length,
+        inProcess: pilot2Bills.filter(b => b.workflowStatus !== "PAID").length,
+        slaCompliance: "98.1%",
+        activeStage: "CSO / General Manager (Ops)"
+      }
+    }
+  });
+});
+
+// 2. Full 34-Workflow Catalog (Section 4 & 12.1)
+app.get("/api/workflows/catalog", (req, res) => {
+  res.json({
+    totalWorkflows: WORKFLOW_CATALOG.length,
+    categories: WORKFLOW_CATEGORIES,
+    workflows: WORKFLOW_CATALOG
+  });
+});
+
+app.get("/api/workflows/categories", (req, res) => {
+  res.json(WORKFLOW_CATEGORIES);
+});
+
+// 3. Section 12 Proposal Deliverables Inspection
+app.get("/api/proposal/deliverables", (req, res) => {
+  res.json({
+    status: "READY_FOR_EXECUTIVE_REVIEW",
+    projectGovernance: {
+      projectSponsor: "CEO",
+      businessOwner: "Col. Jyothi",
+      technicalLead: "Raghavendra",
+      developmentTeam: "IT Core Team",
+      processValidation: "Finance/Accounts & Operations Representatives"
+    },
+    deliverablesList: [
+      { id: 1, title: "Workflow Master derived from billing-process document", status: "COMPLETED", count: "34 Workflows Digitized" },
+      { id: 2, title: "Identification of common & client-specific workflow stages", status: "COMPLETED", detail: "7 Canonical Stages + 5 Unique Client Routes" },
+      { id: 3, title: "Proposed Database Structure (PostgreSQL/TimescaleDB)", status: "COMPLETED", detail: "10 Third-Normal-Form Tables with JSONB Config" },
+      { id: 4, title: "Proposed Application Architecture", status: "COMPLETED", detail: "Hexagonal Decoupled Architecture (Engine + REST + UI)" },
+      { id: 5, title: "Screen & Module List", status: "COMPLETED", detail: "6 Enterprise Cockpit Screens" },
+      { id: 6, title: "User-Role RACI Matrix", status: "COMPLETED", detail: "Defined across 8 Key Organizational Personas" },
+      { id: 7, title: "API Architecture for Future HRMS Integration", status: "COMPLETED", detail: "OpenAPI 3.1 Dual-Channel REST Webhook Protocol" },
+      { id: 8, title: "Proposed Phase-I Development Timeline", status: "COMPLETED", detail: "8 Weeks to Go-Live" },
+      { id: 9, title: "Resource Requirement", status: "COMPLETED", detail: "1 Lead + 2 Full-Stack + 1 QA + 0.5 DevOps" },
+      { id: 10, title: "Two Proposed Pilot Units with Justification", status: "COMPLETED", detail: "BBMP Lakes North Zone & BMRCL Project Wing" },
+      { id: 11, title: "Information Required from Finance/Accounts to Finalise", status: "COMPLETED", detail: "Action Questionnaire Formulated" }
+    ]
   });
 });
 

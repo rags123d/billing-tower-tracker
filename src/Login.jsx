@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { API_BASE } from "./config";
 
 export default function Login({ onLoginSuccess }) {
   const [identifier, setIdentifier] = useState("");
@@ -19,7 +18,7 @@ export default function Login({ onLoginSuccess }) {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      const res = await fetch("http://localhost:4000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier: identifier.trim(), password })
@@ -45,9 +44,13 @@ export default function Login({ onLoginSuccess }) {
 
       <div className="auth-container">
         <div className="auth-brand">
+          <div className="auth-logo-badge">
+            <span>🏛️</span>
+            <span>Government Portal — Secure Access</span>
+          </div>
           <h1>Billing Tower Tracker</h1>
-          <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: "0.87rem", letterSpacing: "0.03em" }}>
-            Government Portal — Secure Access
+          <p className="auth-subtitle">
+            AI-Enabled Billing &amp; Governance Control Tower
           </p>
         </div>
         <div className="auth-card">
@@ -57,20 +60,20 @@ export default function Login({ onLoginSuccess }) {
               <span>{error}</span>
             </div>
           )}
-          <form className="auth-form" onSubmit={handleSubmit}>
+          <form className="auth-form" onSubmit={handleSubmit} autoComplete="off">
             <div className="form-group">
-              <label htmlFor="identifier">Username or Email</label>
+              <label htmlFor="identifier">Username</label>
               <div className="input-wrapper">
                 <span className="input-icon">👤</span>
                 <input
                   id="identifier"
                   type="text"
                   className="auth-input"
-                  placeholder="e.g. officer@billing.gov or officer"
+                  placeholder="billing_tower"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   disabled={loading}
-                  autoComplete="username"
+                  autoComplete="off"
                   required
                 />
               </div>
@@ -84,11 +87,11 @@ export default function Login({ onLoginSuccess }) {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   className="auth-input"
-                  placeholder="Enter your password"
+                  placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   required
                 />
                 <button
