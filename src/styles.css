@@ -1077,19 +1077,14 @@ main {
   letter-spacing: 0.04em;
 }
 
-/* Completed and User-Checked step node (VIBRANT GREEN TICK MARK) */
-.node.completed,
-.node.user-checked {
+/* Workflow-completed and clicked stages both use green checks. */
+.node.completed {
   color: #065f46;
 }
 
 .node.completed .dot,
-.node.user-checked .dot,
 .node.completed.active .dot,
-.node.user-checked.active .dot,
-.node.completed.selected .dot,
-.node.user-checked.selected .dot,
-.node.selected:not(.active):not(.completed).user-checked .dot {
+.node.completed.selected .dot {
   background: #ecfdf5 !important;
   color: #059669 !important;
   border: 2.5px solid #10b981 !important;
@@ -1097,8 +1092,7 @@ main {
   transform: scale(1.18);
 }
 
-.node.completed .dot::after,
-.node.user-checked .dot::after {
+.node.completed .dot::after {
   content: "";
   position: absolute;
   inset: -6px;
@@ -1113,14 +1107,61 @@ main {
   50% { transform: scale(1.22); opacity: 0; }
 }
 
-.node.completed .line,
-.node.user-checked .line {
+.node.completed .line {
   background: #10b981 !important;
 }
 
+/* A clicked stage is green-checked without changing workflow completion. */
+.node.user-checked {
+  color: #065f46;
+}
+
+.node.user-checked .dot,
+.node.user-checked.active .dot,
+.node.user-checked.selected .dot,
+.node.selected:not(.active):not(.completed).user-checked .dot {
+  background: #ecfdf5 !important;
+  color: #059669 !important;
+  border: 2.5px solid #10b981 !important;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25), 0 4px 12px rgba(16, 185, 129, 0.3) !important;
+  transform: scale(1.18);
+}
+
+.node.user-checked .dot::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid rgba(16, 185, 129, 0.6);
+  animation: glowRingGreen 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.node.user-checked .line {
+  background: linear-gradient(90deg, #10b981, rgba(16, 185, 129, 0.4)) !important;
+}
+
+.node.user-checked .dot .tick-anim {
+  color: #059669 !important;
+}
+
+.node.user-checked .clicked-passed-label {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+}
+
 /* Inspected state for user-checked or completed node */
-.node.inspected.user-checked .dot,
 .node.inspected.completed .dot {
+  background: #d1fae5 !important;
+  color: #047857 !important;
+  box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.45), 0 6px 18px rgba(16, 185, 129, 0.4) !important;
+  border-color: #059669 !important;
+  transform: scale(1.22);
+}
+
+.node.inspected.user-checked .dot {
   background: #d1fae5 !important;
   color: #047857 !important;
   box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.45), 0 6px 18px rgba(16, 185, 129, 0.4) !important;
@@ -1140,7 +1181,6 @@ main {
   overflow: visible;
 }
 
-.node.user-checked .dot .tick-anim,
 .node.completed .dot .tick-anim {
   position: relative;
   z-index: 2;
@@ -9903,4 +9943,3 @@ main {
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
 }
-

@@ -214,6 +214,7 @@ function AppMain({ user, token, onLogout }) {
   // Load bill data whenever activeBillId changes
   const loadBill = useCallback(
     async (targetId = activeBillId) => {
+      setCheckedSteps(new Set());
       setLoading(true);
       try {
         const res = await fetchWithAuth(`${API}/bills/${targetId}`);
@@ -252,6 +253,7 @@ function AppMain({ user, token, onLogout }) {
   };
 
   const handleBillCreated = (newBill) => {
+    setCheckedSteps(new Set());
     setBillsList((prev) => {
       const exists = prev.some((b) => b.id === newBill.id);
       if (exists) return prev;
@@ -315,10 +317,12 @@ function AppMain({ user, token, onLogout }) {
     if (step >= bill.currentStep) {
       setSelectedStep(step);
     }
-    // Always add the tick mark for the clicked step (don't toggle off)
+    // Checking a later stage also marks all preceding stages.
     setCheckedSteps((prev) => {
       const next = new Set(prev);
-      next.add(step);
+      for (let checkedStep = 1; checkedStep <= step; checkedStep += 1) {
+        next.add(checkedStep);
+      }
       return next;
     });
     // Smooth-scroll to details panel after render
@@ -340,7 +344,9 @@ function AppMain({ user, token, onLogout }) {
       }
       setCheckedSteps((prev) => {
         const next = new Set(prev);
-        next.add(newStep);
+        for (let checkedStep = 1; checkedStep <= newStep; checkedStep += 1) {
+          next.add(checkedStep);
+        }
         return next;
       });
       setTimeout(() => {
@@ -712,6 +718,7 @@ function AppMain({ user, token, onLogout }) {
               bill={bill}
               user={user}
               saving={saving}
+              checkedSteps={checkedSteps}
               onStepClick={handleStepClick}
               onTransitionStep={(target) => saveStep(target)}
               onSwitchBill={handleBillSwitch}

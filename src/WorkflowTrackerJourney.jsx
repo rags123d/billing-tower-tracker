@@ -8,6 +8,7 @@ import {
 export default function WorkflowTrackerJourney({
   bill,
   user,
+  checkedSteps = new Set(),
   onStepClick,
   onTransitionStep,
   saving = false,
@@ -49,6 +50,7 @@ export default function WorkflowTrackerJourney({
     totalStages,
     progressPercentage
   } = tracking;
+  const checkedThroughStep = Math.max(0, ...checkedSteps);
 
   const handleCopyId = () => {
     if (bill?.id) {
@@ -61,10 +63,10 @@ export default function WorkflowTrackerJourney({
   // Filter stages based on selected phase filter
   const displayedStages = useMemo(() => {
     if (!bill?.stages) return [];
-    if (selectedPhaseFilter === "ALL") return bill.stages;
+    const stages = bill.stages.map((name, index) => ({ name, step: index + 1 }));
+    if (selectedPhaseFilter === "ALL") return stages;
 
-    return bill.stages.filter((st, idx) => {
-      const step = idx + 1;
+    return stages.filter(({ step }) => {
       const ph = journeyPhases.find((p) => p.id === selectedPhaseFilter);
       return ph?.stages.some((s) => s.step === step);
     });
@@ -438,9 +440,10 @@ export default function WorkflowTrackerJourney({
           {/* Stepper Node Ribbon */}
           <div className="wt-timeline-scroll">
             <div className="timeline">
-              {displayedStages.map((stageName, i) => {
-                const step = i + 1;
+              {displayedStages.map(({ name: stageName, step }) => {
                 const isCompleted = step < currentStage.step;
+                const isChecked = step <= checkedThroughStep;
+                const isPassed = isCompleted || isChecked;
                 const isActive = step === currentStage.step;
                 const isUpcoming = step > currentStage.step;
                 const phase = CANONICAL_JOURNEY_PHASES.find(
@@ -451,20 +454,25 @@ export default function WorkflowTrackerJourney({
                   <button
                     key={stageName + step}
                     type="button"
-                    className={`node ${isCompleted ? "completed" : ""} ${isActive ? "active" : ""} ${
+                    className={`node ${isCompleted ? "completed" : ""} ${
+                      isChecked ? "user-checked" : ""
+                    } ${isActive ? "active" : ""} ${
                       isUpcoming ? "upcoming" : ""
                     }`}
                     onClick={() => onStepClick && onStepClick(step)}
                     title={`Click to view operational protocol & checklist for Step ${step}: ${stageName}`}
+                    aria-pressed={isChecked}
                   >
                     <span className="line" />
                     <span className="dot">
-                      {isCompleted ? <span className="tick-anim">✓</span> : step}
+                      {isPassed ? <span className="tick-anim">✓</span> : step}
                     </span>
                     <span className="stage-no">STEP {step}</span>
                     <span className="stage-title">{stageName}</span>
-                    {isCompleted ? (
-                      <span className="passed-label">PASSED ✓</span>
+                    {isPassed ? (
+                      <span className={`passed-label ${isChecked && !isCompleted ? "clicked-passed-label" : ""}`}>
+                        PASSED ✓
+                      </span>
                     ) : isActive ? (
                       <span className="current-label">CURRENT</span>
                     ) : (
@@ -502,6 +510,8 @@ export default function WorkflowTrackerJourney({
                 {bill.stages.map((stName, idx) => {
                   const stepNum = idx + 1;
                   const isCompleted = stepNum < currentStage.step;
+                  const isChecked = stepNum <= checkedThroughStep;
+                  const isPassed = isCompleted || isChecked;
                   const isActive = stepNum === currentStage.step;
                   const phaseInfo = CANONICAL_JOURNEY_PHASES.find((p) =>
                     p.stages?.some((s) => s.step === stepNum)
@@ -511,7 +521,7 @@ export default function WorkflowTrackerJourney({
                   return (
                     <tr
                       key={stepNum}
-                      className={isActive ? "wt-row-active" : isCompleted ? "wt-row-completed" : ""}
+                      className={isActive && !isPassed ? "wt-row-active" : isPassed ? "wt-row-completed" : ""}
                       onClick={() => onStepClick && onStepClick(stepNum)}
                       style={{ cursor: "pointer" }}
                     >
@@ -532,7 +542,7 @@ export default function WorkflowTrackerJourney({
                         </div>
                       </td>
                       <td>
-                        {isCompleted ? (
+                        {isPassed ? (
                           <span className="status-pill status-paid">✓ Passed</span>
                         ) : isActive ? (
                           <span className="status-pill status-under_review">● Active</span>
