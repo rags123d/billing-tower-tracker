@@ -9,7 +9,6 @@ export default function WorkflowTrackerJourney({
   bill,
   user,
   checkedSteps = new Set(),
-  inspectedStep,
   onStepClick,
   onTransitionStep,
   saving = false,
@@ -51,9 +50,7 @@ export default function WorkflowTrackerJourney({
     totalStages,
     progressPercentage
   } = tracking;
-  const inspectedThroughStep =
-    inspectedStep > currentStage.step ? inspectedStep : 0;
-  const checkedThroughStep = Math.max(0, inspectedThroughStep, ...checkedSteps);
+  const furthestUserPassedStep = Math.max(currentStage.step, ...checkedSteps);
 
   const handleCopyId = () => {
     if (bill?.id) {
@@ -445,9 +442,13 @@ export default function WorkflowTrackerJourney({
             <div className="timeline">
               {displayedStages.map(({ name: stageName, step }) => {
                 const isCompleted = step < currentStage.step;
-                const isChecked = step <= checkedThroughStep;
-                const isPassed = isCompleted || isChecked;
+                const isUserPassed = checkedSteps.has(step) && step > currentStage.step;
+                const isPassed = isCompleted || isUserPassed;
                 const isActive = step === currentStage.step;
+                const isSkippedPending =
+                  step > currentStage.step &&
+                  step < furthestUserPassedStep &&
+                  !isUserPassed;
                 const isUpcoming = step > currentStage.step;
                 const phase = CANONICAL_JOURNEY_PHASES.find(
                   (p) => p.stages?.some((s) => s.step === step)
@@ -458,22 +459,25 @@ export default function WorkflowTrackerJourney({
                     key={stageName + step}
                     type="button"
                     className={`node ${isCompleted ? "completed" : ""} ${
-                      isChecked ? "user-checked" : ""
-                    } ${isActive ? "active" : ""} ${
+                      isUserPassed ? "user-checked" : ""
+                    } ${isSkippedPending ? "forward-pending" : ""} ${isActive ? "active" : ""} ${
                       isUpcoming ? "upcoming" : ""
                     }`}
                     onClick={() => onStepClick && onStepClick(step)}
                     title={`Click to view operational protocol & checklist for Step ${step}: ${stageName}`}
-                    aria-pressed={isChecked}
+                    aria-current={isActive ? "step" : undefined}
+                    aria-pressed={isUserPassed}
                   >
                     <span className="line" />
                     <span className="dot">
-                      {isPassed ? <span className="tick-anim">✓</span> : step}
+                      {isPassed || isActive || isSkippedPending ? (
+                        <span className="tick-anim">✓</span>
+                      ) : step}
                     </span>
                     <span className="stage-no">STEP {step}</span>
                     <span className="stage-title">{stageName}</span>
                     {isPassed ? (
-                      <span className={`passed-label ${isChecked && !isCompleted ? "clicked-passed-label" : ""}`}>
+                      <span className={`passed-label ${isUserPassed ? "clicked-passed-label" : ""}`}>
                         PASSED ✓
                       </span>
                     ) : isActive ? (
@@ -513,9 +517,13 @@ export default function WorkflowTrackerJourney({
                 {bill.stages.map((stName, idx) => {
                   const stepNum = idx + 1;
                   const isCompleted = stepNum < currentStage.step;
-                  const isChecked = stepNum <= checkedThroughStep;
-                  const isPassed = isCompleted || isChecked;
+                  const isUserPassed = checkedSteps.has(stepNum) && stepNum > currentStage.step;
+                  const isPassed = isCompleted || isUserPassed;
                   const isActive = stepNum === currentStage.step;
+                  const isSkippedPending =
+                    stepNum > currentStage.step &&
+                    stepNum < furthestUserPassedStep &&
+                    !isUserPassed;
                   const phaseInfo = CANONICAL_JOURNEY_PHASES.find((p) =>
                     p.stages?.some((s) => s.step === stepNum)
                   );
@@ -524,7 +532,15 @@ export default function WorkflowTrackerJourney({
                   return (
                     <tr
                       key={stepNum}
-                      className={isActive && !isPassed ? "wt-row-active" : isPassed ? "wt-row-completed" : ""}
+                      className={
+                        isActive
+                          ? "wt-row-active"
+                          : isPassed
+                          ? "wt-row-completed"
+                          : isSkippedPending
+                          ? "wt-row-forward-pending"
+                          : ""
+                      }
                       onClick={() => onStepClick && onStepClick(stepNum)}
                       style={{ cursor: "pointer" }}
                     >
@@ -549,6 +565,10 @@ export default function WorkflowTrackerJourney({
                           <span className="status-pill status-paid">✓ Passed</span>
                         ) : isActive ? (
                           <span className="status-pill status-under_review">● Active</span>
+                        ) : isSkippedPending ? (
+                          <span className="status-pill status-closed">
+                            <span className="forward-pending-tick">✓</span> Pending
+                          </span>
                         ) : (
                           <span className="status-pill status-closed">⏳ Pending</span>
                         )}

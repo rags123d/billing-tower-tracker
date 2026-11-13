@@ -137,7 +137,6 @@ function AppMain({ user, token, onLogout }) {
   });
   const [billsList, setBillsList] = useState([]);
   const [bill, setBill] = useState(null);
-  const [selectedStep, setSelectedStep] = useState(null);
   const [inspectedStep, setInspectedStep] = useState(null);
   const [showDetails, setShowDetails] = useState(true);
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -228,7 +227,6 @@ function AppMain({ user, token, onLogout }) {
         setBill(data);
         setActiveBillId(data.id);
         localStorage.setItem("billing_active_bill_id", data.id);
-        setSelectedStep(data.currentStep);
         setInspectedStep(data.currentStep);
         setShowDetails(true);
         setPhotoIndex(0);
@@ -274,7 +272,6 @@ function AppMain({ user, token, onLogout }) {
     setBill(newBill);
     setActiveBillId(newBill.id);
     localStorage.setItem("billing_active_bill_id", newBill.id);
-    setSelectedStep(newBill.currentStep);
     setInspectedStep(newBill.currentStep);
     setPhotoIndex(0);
     setToast(`Bill "${newBill.id}" created & activated successfully!`);
@@ -314,17 +311,9 @@ function AppMain({ user, token, onLogout }) {
   const handleStepClick = (step) => {
     setInspectedStep(step);
     setShowDetails(true);
-    if (step >= bill.currentStep) {
-      setSelectedStep(step);
+    if (step > bill.currentStep) {
+      setCheckedSteps(new Set([step]));
     }
-    // Checking a later stage also marks all preceding stages.
-    setCheckedSteps((prev) => {
-      const next = new Set(prev);
-      for (let checkedStep = 1; checkedStep <= step; checkedStep += 1) {
-        next.add(checkedStep);
-      }
-      return next;
-    });
     // Smooth-scroll to details panel after render
     setTimeout(() => {
       const panel = document.getElementById("step-details-panel");
@@ -339,16 +328,9 @@ function AppMain({ user, token, onLogout }) {
     if (newStep >= 1 && newStep <= bill.stages.length) {
       setInspectedStep(newStep);
       setShowDetails(true);
-      if (newStep >= bill.currentStep) {
-        setSelectedStep(newStep);
+      if (newStep > bill.currentStep) {
+        setCheckedSteps(new Set([newStep]));
       }
-      setCheckedSteps((prev) => {
-        const next = new Set(prev);
-        for (let checkedStep = 1; checkedStep <= newStep; checkedStep += 1) {
-          next.add(checkedStep);
-        }
-        return next;
-      });
       setTimeout(() => {
         const panel = document.getElementById("step-details-panel");
         if (panel) {
@@ -358,16 +340,12 @@ function AppMain({ user, token, onLogout }) {
     }
   };
 
-  async function saveStep(target = selectedStep) {
-    const stepToTransition = target || selectedStep;
-    if (!stepToTransition || stepToTransition < bill.currentStep) {
-      setToast("Earlier steps cannot be selected. Workflows are forward-only.");
+  async function saveStep(target = bill.currentStep + 1) {
+    if (target !== bill.currentStep + 1) {
+      setToast(`Stages must be approved in order. Complete Step ${bill.currentStep + 1} first.`);
       return;
     }
-    if (stepToTransition === bill.currentStep) {
-      setToast(`Workflow is already at Step ${stepToTransition} (${bill.stages[stepToTransition - 1]}).`);
-      return;
-    }
+    const stepToTransition = target;
     setSaving(true);
     try {
       const res = await fetchWithAuth(`${API}/bills/${bill.id}/transition`, {
@@ -377,8 +355,8 @@ function AppMain({ user, token, onLogout }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Transition failed");
+      setCheckedSteps(new Set());
       setBill(data);
-      setSelectedStep(data.currentStep);
       setInspectedStep(data.currentStep);
       setShowDetails(true);
       setToast(data.message || `Workflow updated to Step ${stepToTransition} successfully.`);
@@ -719,7 +697,6 @@ function AppMain({ user, token, onLogout }) {
               user={user}
               saving={saving}
               checkedSteps={checkedSteps}
-              inspectedStep={inspectedStep}
               onStepClick={handleStepClick}
               onTransitionStep={(target) => saveStep(target)}
               onSwitchBill={handleBillSwitch}
@@ -772,7 +749,7 @@ function AppMain({ user, token, onLogout }) {
             <div className="action-bar">
               <div className="action-bar-info">
                 <b>
-                  Target: Step {selectedStep} — {bill.stages[selectedStep - 1]}
+                  Target: Step {Math.min(bill.currentStep + 1, bill.stages.length)} — {bill.stages[Math.min(bill.currentStep, bill.stages.length - 1)]}
                 </b>
                 <small>
                   Authorizing as <strong>{user.name}</strong> ({user.role})
@@ -780,8 +757,8 @@ function AppMain({ user, token, onLogout }) {
               </div>
               <button
                 className="primary"
-                onClick={() => saveStep(selectedStep)}
-                disabled={saving || selectedStep < bill.currentStep}
+                onClick={() => saveStep(bill.currentStep + 1)}
+                disabled={saving || bill.currentStep >= bill.stages.length}
               >
                 {saving ? "Authorizing…" : "Approve & Transition Step"}
               </button>

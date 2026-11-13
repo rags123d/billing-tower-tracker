@@ -25,6 +25,7 @@ export default function StepDetails({
   const isCompleted = step < currentStep;
   const isCurrent = step === currentStep;
   const isUpcoming = step > currentStep;
+  const isNextStep = step === currentStep + 1;
   const isUserChecked = checkedSteps.has(step) && !isCompleted;
 
   // Track individually checked checklist items within each step
@@ -84,7 +85,7 @@ export default function StepDetails({
             )}
             {isUserChecked && (
               <span className="step-status-pill user-checked-pill">
-                <span className="status-dot">✓</span> CHECKED & INSPECTED
+                <span className="status-dot">✓</span> PASSED ✓
               </span>
             )}
             {isUpcoming && !isUserChecked && (
@@ -106,9 +107,9 @@ export default function StepDetails({
             type="button"
             className={`btn-step-check-toggle ${isCompleted || isUserChecked ? "active" : ""}`}
             onClick={() => onToggleCheck && onToggleCheck(step)}
-            title={isCompleted ? "Step already completed and verified" : "Click to toggle green tick mark"}
+            title={isCompleted ? "Step already completed and verified" : "Click to toggle passed marker"}
           >
-            {isCompleted ? "✓ Verified" : isUserChecked ? "✓ Checked" : "○ Mark as Checked"}
+            {isCompleted ? "✓ Verified" : isUserChecked ? "✓ Passed" : "○ Mark as Passed"}
           </button>
           <button
             type="button"
@@ -344,7 +345,11 @@ export default function StepDetails({
           )}
           {isUpcoming && (
             <span className="footer-notice action">
-              🚀 Ready to transition? Authorizing as <strong>{user.name}</strong> ({user.role})
+              {isNextStep ? (
+                <>🚀 Ready to transition? Authorizing as <strong>{user.name}</strong> ({user.role})</>
+              ) : (
+                <>⏳ Complete Step {currentStep + 1} before advancing to this stage.</>
+              )}
             </span>
           )}
         </div>
@@ -360,7 +365,7 @@ export default function StepDetails({
             </button>
           )}
 
-          {isUpcoming && (
+          {isUpcoming && isNextStep && (
             <button
               type="button"
               className="primary btn-approve-step"

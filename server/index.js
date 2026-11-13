@@ -2923,6 +2923,12 @@ app.post("/api/bills/:id/transition", requireAuth, (req, res) => {
     return res.json({ ...bill, stages, message: "No transition required." });
   }
 
+  if (requested !== bill.currentStep + 1) {
+    return res.status(409).json({
+      error: `Sequential workflow rule: complete Step ${bill.currentStep + 1} before advancing.`
+    });
+  }
+
   const now = new Date();
   const due = new Date(now.getTime() + 2 * 86400000);
   bill.currentStep = requested;
