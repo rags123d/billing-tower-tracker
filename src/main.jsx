@@ -719,6 +719,7 @@ function AppMain({ user, token, onLogout }) {
               user={user}
               saving={saving}
               checkedSteps={checkedSteps}
+              inspectedStep={inspectedStep}
               onStepClick={handleStepClick}
               onTransitionStep={(target) => saveStep(target)}
               onSwitchBill={handleBillSwitch}

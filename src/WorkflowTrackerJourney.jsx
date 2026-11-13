@@ -9,6 +9,7 @@ export default function WorkflowTrackerJourney({
   bill,
   user,
   checkedSteps = new Set(),
+  inspectedStep,
   onStepClick,
   onTransitionStep,
   saving = false,
@@ -50,7 +51,9 @@ export default function WorkflowTrackerJourney({
     totalStages,
     progressPercentage
   } = tracking;
-  const checkedThroughStep = Math.max(0, ...checkedSteps);
+  const inspectedThroughStep =
+    inspectedStep > currentStage.step ? inspectedStep : 0;
+  const checkedThroughStep = Math.max(0, inspectedThroughStep, ...checkedSteps);
 
   const handleCopyId = () => {
     if (bill?.id) {
