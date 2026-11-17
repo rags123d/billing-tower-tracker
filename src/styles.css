@@ -1173,6 +1173,34 @@ main {
   color: #b45309;
 }
 
+.node.active.forward-backtrack {
+  color: #b45309 !important;
+}
+
+.node.active.forward-backtrack .stage-no,
+.node.active.forward-backtrack .stage-title {
+  color: #b45309 !important;
+}
+
+.node.active.forward-backtrack .dot {
+  background: #fffbeb !important;
+  color: #d97706 !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2), 0 4px 12px rgba(217, 119, 6, 0.2) !important;
+}
+
+.node.active.forward-backtrack .dot::after {
+  border-color: rgba(245, 158, 11, 0.5) !important;
+}
+
+.node.active.forward-backtrack .dot .tick-anim {
+  color: #d97706 !important;
+}
+
+.node.active.forward-backtrack .line {
+  background: linear-gradient(90deg, #f59e0b, rgba(245, 158, 11, 0.35)) !important;
+}
+
 .wt-row-forward-pending {
   background: rgba(245, 158, 11, 0.06);
 }

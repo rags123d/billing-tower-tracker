@@ -445,6 +445,8 @@ export default function WorkflowTrackerJourney({
                 const isUserPassed = checkedSteps.has(step) && step > currentStage.step;
                 const isPassed = isCompleted || isUserPassed;
                 const isActive = step === currentStage.step;
+                const isActiveAfterForwardClick =
+                  isActive && furthestUserPassedStep > currentStage.step;
                 const isSkippedPending =
                   step > currentStage.step &&
                   step < furthestUserPassedStep &&
@@ -462,7 +464,7 @@ export default function WorkflowTrackerJourney({
                       isUserPassed ? "user-checked" : ""
                     } ${isSkippedPending ? "forward-pending" : ""} ${isActive ? "active" : ""} ${
                       isUpcoming ? "upcoming" : ""
-                    }`}
+                    } ${isActiveAfterForwardClick ? "forward-backtrack" : ""}`}
                     onClick={() => onStepClick && onStepClick(step)}
                     title={`Click to view operational protocol & checklist for Step ${step}: ${stageName}`}
                     aria-current={isActive ? "step" : undefined}
@@ -476,7 +478,7 @@ export default function WorkflowTrackerJourney({
                     </span>
                     <span className="stage-no">STEP {step}</span>
                     <span className="stage-title">{stageName}</span>
-                    {isPassed ? (
+                    {isPassed || isSkippedPending || isActiveAfterForwardClick ? (
                       <span className={`passed-label ${isUserPassed ? "clicked-passed-label" : ""}`}>
                         PASSED ✓
                       </span>
